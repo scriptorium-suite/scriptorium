@@ -5,7 +5,7 @@
   "observed_on": "2026-07-20",
   "source": {
     "repository": "scriptorium-suite/scriptorium",
-    "commit": null,
+    "commit": "b0e1a14757f7091173d66ac903dfb5e77eeb5bb4",
     "workflow_run": null,
     "runner": "isolated Windows local acceptance",
     "python": "3.12.3",
@@ -14,8 +14,8 @@
   "components": {
     "scriptorium": {
       "version": "0.1.0",
-      "commit": null,
-      "state": "verified working tree"
+      "commit": "b0e1a14757f7091173d66ac903dfb5e77eeb5bb4",
+      "state": "verified local commit"
     },
     "scriptorium-spec": {
       "version": "2.2.0",
