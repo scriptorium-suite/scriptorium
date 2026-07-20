@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "scriptorium-suite"
+version = "0.1.0"
+description = "Thin, agent-native entry point for the Scriptorium research workflow suite"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Apache-2.0" }
+authors = [{ name = "Scriptorium Suite" }]
+keywords = ["ai4science", "research", "agents", "workflow"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: Microsoft :: Windows",
+    "Programming Language :: Python :: 3",
+]
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/scriptorium-suite/scriptorium"
+Specification = "https://github.com/scriptorium-suite/scriptorium-spec"
+
+[project.scripts]
+scriptorium = "scriptorium.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"scriptorium.assets" = [
+    "*.json",
+    "*.md",
+    "*.toml",
+    "skills/*/*.md",
+    "skills/*/agents/*.yaml",
+]
+
+[tool.uv]
+required-version = "==0.11.16"
+python-preference = "only-managed"

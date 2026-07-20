@@ -1,0 +1,197 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+        python-version: ["3.11", "3.12"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: python -m pip install --no-deps .
+      - run: scriptorium --version
+      - run: scriptorium init --help
+      - run: scriptorium inventory --help
+      - run: scriptorium status --help
+      - run: scriptorium doctor --help
+      - run: scriptorium host install --help
+      - run: python -m unittest discover -s tests -v
+
+  e2e-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          path: scriptorium
+          persist-credentials: false
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          repository: scriptorium-suite/scriptorium-spec
+          ref: 9f044458a9ec106b7959a1ea961c40774081a1d2
+          path: scriptorium-spec
+          persist-credentials: false
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          repository: scriptorium-suite/steward
+          ref: dcdb46726493bd13735b1c0f327331bbebee7047
+          path: steward
+          persist-credentials: false
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          repository: foxsplendid/Provenance
+          ref: 4addf490526840ef9220d8d13f15832f6df4d346
+          path: Provenance
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+      - name: Install source checkouts
+        shell: pwsh
+        run: |
+          python -m venv .demo-venv
+          .\.demo-venv\Scripts\python.exe -m pip install --no-deps .\scriptorium
+          .\.demo-venv\Scripts\python.exe -m pip install --no-deps .\steward
+          .\.demo-venv\Scripts\python.exe -m pip install --no-deps .\Provenance
+      - name: Smoke installed public pull entries
+        shell: pwsh
+        run: |
+          & .\.demo-venv\Scripts\prov-sync-pull.exe --help | Out-Null
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & .\.demo-venv\Scripts\prov-sync-pending.exe --help | Out-Null
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & .\.demo-venv\Scripts\prov-sync-fill.exe --help | Out-Null
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & .\.demo-venv\Scripts\prov-sync-unresolved.exe --help | Out-Null
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+          $raw = & .\.demo-venv\Scripts\prov-sync-pull.exe --capabilities --json
+          $code = $LASTEXITCODE
+          if ($code -ne 0) { throw "Provenance capability probe exited $code" }
+
+          $capabilities = ($raw -join "`n") | ConvertFrom-Json
+          if ($capabilities.operation -ne "pull.capabilities") {
+            throw "Unexpected Provenance capability operation"
+          }
+          if ($capabilities.generated_by.name -ne "provenance") {
+            throw "Unexpected Provenance capability producer"
+          }
+          if ($capabilities.capabilities.pull_lock -ne $true) {
+            throw "Installed Provenance lacks pull-lock support"
+          }
+
+          & .\.demo-venv\Scripts\scriptorium.exe pull --help | Out-Null
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & .\.demo-venv\Scripts\scriptorium.exe inventory --help | Out-Null
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & .\.demo-venv\Scripts\scriptorium.exe status --help | Out-Null
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+          $errorRaw = & .\.demo-venv\Scripts\scriptorium.exe pull --json 2>$null
+          $errorCode = $LASTEXITCODE
+          if ($errorCode -ne 2) {
+            throw "Expected JSON usage error exit 2, received $errorCode"
+          }
+
+          $errorReport = ($errorRaw -join "`n") | ConvertFrom-Json
+          if (
+            $errorReport.operation -ne "pull" -or
+            $errorReport.status -ne "error" -or
+            $errorReport.exit_code -ne 2
+          ) {
+            throw "JSON usage-error envelope changed"
+          }
+          $global:LASTEXITCODE = 0
+      - name: Smoke installed content-free inventory
+        shell: pwsh
+        run: |
+          $source = Join-Path $env:RUNNER_TEMP 'inventory source α'
+          $conversation = Join-Path $env:RUNNER_TEMP 'inventory conversations'
+          $zotero = Join-Path $env:RUNNER_TEMP 'inventory zotero'
+          New-Item -ItemType Directory -Path $source, $conversation, $zotero | Out-Null
+
+          [IO.File]::WriteAllText((Join-Path $source 'private-note.md'), 'PRIVATE_RESEARCH_SENTINEL')
+          [IO.File]::WriteAllText((Join-Path $source 'private-paper.pdf'), 'PRIVATE_PDF_SENTINEL')
+          [IO.File]::WriteAllText((Join-Path $conversation 'chat-history.zip'), 'PRIVATE_CHAT_SENTINEL')
+          [IO.File]::WriteAllText((Join-Path $zotero 'library.bib'), 'PRIVATE_ZOTERO_SENTINEL')
+
+          $raw = & .\.demo-venv\Scripts\scriptorium.exe inventory `
+            --source $source `
+            --conversation-export $conversation `
+            --zotero-export $zotero `
+            --json
+          $code = $LASTEXITCODE
+          if ($code -ne 0) { throw "Installed inventory exited $code" }
+
+          $serialized = $raw -join "`n"
+          $report = $serialized | ConvertFrom-Json
+          if (
+            $report.operation -ne 'inventory' -or
+            $report.status -ne 'planned' -or
+            $report.summary.candidates -ne 4
+          ) {
+            throw "Installed inventory report changed"
+          }
+          foreach ($privateValue in @(
+            $source,
+            $conversation,
+            $zotero,
+            'private-note.md',
+            'private-paper.pdf',
+            'chat-history.zip',
+            'library.bib',
+            'PRIVATE_RESEARCH_SENTINEL'
+          )) {
+            if ($serialized.Contains($privateValue)) {
+              throw "Inventory report exposed a private source value"
+            }
+          }
+          if ([IO.File]::ReadAllText((Join-Path $source 'private-note.md')) -ne 'PRIVATE_RESEARCH_SENTINEL') {
+            throw "Inventory modified a source file"
+          }
+      - name: Run isolated public pull E2E
+        shell: pwsh
+        run: |
+          & .\.demo-venv\Scripts\python.exe `
+            .\scriptorium\tests\e2e_pull.py `
+            --provenance-root .\Provenance
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Run credential-free golden path
+        shell: pwsh
+        run: |
+          .\.demo-venv\Scripts\scriptorium.exe doctor `
+            --target demo `
+            --json `
+            --spec-root .\scriptorium-spec `
+            --steward-root .\steward `
+            --provenance-root .\Provenance > .\doctor-report.json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          .\.demo-venv\Scripts\python.exe -c "import json, pathlib; report=json.loads(pathlib.Path(r'.\doctor-report.json').read_text(encoding='utf-8-sig')); assert report['status'] == 'ready'; assert report['readiness']['demo'] == 'ready'; assert report['readiness']['public_alpha'] == 'incomplete'; assert report['readiness']['literature'] in {'detected', 'file-only'}; assert report['readiness']['slides'] != 'ready'; assert report['checks'][0]['network']['os_egress'] == 'not-observed'"
+          .\.demo-venv\Scripts\scriptorium.exe demo `
+            --output '.\demo 输出' `
+            --spec-root .\scriptorium-spec `
+            --steward-root .\steward `
+            --provenance-root .\Provenance
+          .\.demo-venv\Scripts\python.exe -m json.tool '.\demo 输出\demo-report.json'
+          .\.demo-venv\Scripts\python.exe -c "import json, pathlib; report=json.loads(pathlib.Path(r'.\demo 输出\demo-report.json').read_text(encoding='utf-8')); assert report['demo_status'] == 'passed'"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: scriptorium-demo-windows
+          path: |
+            demo 输出
+            doctor-report.json
+          retention-days: 14

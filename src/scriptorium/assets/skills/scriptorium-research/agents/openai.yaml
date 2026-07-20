@@ -1,0 +1,4 @@
+interface:
+  display_name: "Scriptorium Research"
+  short_description: "Advance and safely close out research work"
+  default_prompt: "Use $scriptorium-research to advance this research task and persist a reviewable closeout."

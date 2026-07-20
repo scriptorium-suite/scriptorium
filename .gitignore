@@ -1,0 +1,49 @@
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+build/
+dist/
+scriptorium-demo/
+
+# Local configuration and credentials
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+*.token
+
+# Local suite state and generated reports
+.scriptorium/
+*.log
+*.db
+*.sqlite
+*.sqlite3
+*.jsonl
+
+# Private research inputs and exports
+*.pdf
+*.bib
+*.ris
+*.rdf
+*.docx
+*.pptx
+conversations/
+sessions/
+research-data/
+zotero-exports/
+
+# Agent, editor, and OS state
+.agents/
+.codex/
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

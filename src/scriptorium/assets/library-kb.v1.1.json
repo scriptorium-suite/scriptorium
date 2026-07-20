@@ -1,0 +1,58 @@
+{
+  "schema_version": "library-kb/1.1",
+  "generated_by": "scriptorium demo fixture",
+  "library": {
+    "type": "user",
+    "id": "synthetic-demo"
+  },
+  "items": [
+    {
+      "key": "DEMO0001",
+      "citekey": "chen2022PhysicsInformed",
+      "title": "Physics-informed learning for materials discovery",
+      "authors": ["Chen"],
+      "year": "2022",
+      "doi": "10.5555/demo.0001",
+      "itemType": "journalArticle",
+      "folders": ["AI4Science/Materials"],
+      "tags": ["ai:physics-informed"],
+      "aiTags": ["physics-informed"],
+      "tldr": "Physics priors constrain data-driven materials models.",
+      "readStatus": "Read",
+      "abstract": "This synthetic abstract describes physics-informed materials learning.",
+      "dateAdded": "2026-07-01 00:00:00"
+    },
+    {
+      "key": "DEMO0002",
+      "citekey": "liu2024ActiveLearning",
+      "title": "Active learning for closed-loop materials experiments",
+      "authors": ["Liu"],
+      "year": "2024",
+      "doi": "10.5555/demo.0002",
+      "itemType": "journalArticle",
+      "folders": ["AI4Science/Materials/Active Learning"],
+      "tags": ["ai:active-learning", "ai:uncertainty-calibration"],
+      "aiTags": ["active-learning", "uncertainty-calibration"],
+      "tldr": "Active learning prioritizes informative experiments with explicit uncertainty calibration.",
+      "readStatus": "To Read",
+      "abstract": "This synthetic abstract describes adaptive experiment selection and calibration.",
+      "dateAdded": "2026-07-02 00:00:00"
+    },
+    {
+      "key": "DEMO0003",
+      "citekey": "taylor2023BoundaryControl",
+      "title": "Boundary negative control for topic selection",
+      "authors": ["Taylor"],
+      "year": "2023",
+      "doi": "",
+      "itemType": "journalArticle",
+      "folders": ["AI4Science/MaterialsX"],
+      "tags": [],
+      "aiTags": [],
+      "tldr": "This paper must not match the Materials topic boundary.",
+      "readStatus": "New",
+      "abstract": "This is a synthetic negative-control record.",
+      "dateAdded": "2026-07-03 00:00:00"
+    }
+  ]
+}

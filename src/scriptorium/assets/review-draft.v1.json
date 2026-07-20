@@ -1,0 +1,20 @@
+{
+  "schema_version": "review-draft/1.0",
+  "title": "AI4Science Materials Research Map",
+  "framing": "The selected papers connect physics-informed modeling with adaptive experimentation.",
+  "intro": "This recorded synthetic draft demonstrates how an agent can organize a local literature snapshot without changing the source library.",
+  "sections": [
+    {
+      "title": "Physics-informed foundations",
+      "body": "Chen 2022 motivates embedding physical priors; this claim is based only on the supplied synthetic abstract.",
+      "covered_keys": ["DEMO0001"]
+    },
+    {
+      "title": "Adaptive experimentation",
+      "body": "Liu 2024 frames active learning as a way to prioritize informative experiments; close reading remains required.",
+      "covered_keys": ["DEMO0002"]
+    }
+  ],
+  "gaps_future": "Compare uncertainty calibration and experimental cost models after full-text review.",
+  "priority_reads": ["DEMO0001", "DEMO0002"]
+}
