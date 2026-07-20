@@ -23,6 +23,7 @@ from .demo import (
 )
 from .host import HostInstallError, inspect_host_installation
 from .init import parse_project_frontmatter
+from .path_selection import format_path_selection, resolve_codex_home
 
 
 TARGETS = ("demo", "public-alpha")
@@ -673,20 +674,16 @@ def _host_adapter_check(
 
 
 def _codex_scan_location() -> dict[str, Any]:
-    configured = os.environ.get("CODEX_HOME")
-    if configured and configured.strip():
-        requested = Path(os.path.expandvars(configured.strip())).expanduser()
-        source = "CODEX_HOME"
-    else:
-        profile = None
-        source = "Path.home"
-        for name in ("USERPROFILE", "HOME"):
-            value = os.environ.get(name)
-            if value and value.strip():
-                profile = Path(os.path.expandvars(value.strip())).expanduser()
-                source = name
-                break
-        requested = (profile or Path.home()) / ".codex"
+    requested, source, state = resolve_codex_home()
+    if requested is None:
+        return {
+            "root": None,
+            "source": source,
+            "sessions": None,
+            "state": state,
+            "root_exists": False,
+            "sessions_exist": False,
+        }
     try:
         root = requested.resolve(strict=False)
     except (OSError, RuntimeError):
@@ -696,6 +693,7 @@ def _codex_scan_location() -> dict[str, Any]:
         "root": str(root),
         "source": source,
         "sessions": str(sessions),
+        "state": state,
         "root_exists": root.is_dir(),
         "sessions_exist": sessions.is_dir(),
     }
@@ -710,7 +708,15 @@ def _agent_capture_check(
     claude_ready = "claude-code" in ready_hosts
     manual = claude_ready and not codex_ready
     codex_scan = _codex_scan_location()
-    if codex_ready:
+    codex_home_unavailable = bool(
+        codex_ready and codex_scan["state"] != "ready"
+    )
+    if codex_home_unavailable:
+        summary = (
+            "Codex log home is unavailable; capture will report zero sessions until "
+            "Codex creates it or the configured location is corrected"
+        )
+    elif codex_ready:
         summary = (
             "Codex capture can use the explicit local-log scan in `scriptorium pull` "
             f"from {codex_scan['root']}"
@@ -731,8 +737,23 @@ def _agent_capture_check(
         summary=summary,
         details={
             "ready_hosts": sorted(ready_hosts),
-            "codex_scan": "available" if codex_ready else "unavailable",
+            "codex_scan": (
+                "configured-home-missing"
+                if codex_home_unavailable
+                and codex_scan["source"] == "CODEX_HOME"
+                and codex_scan["state"] == "missing"
+                else "home-unavailable"
+                if codex_home_unavailable
+                else "available"
+                if codex_ready
+                else "unavailable"
+            ),
             "codex_scan_location": codex_scan,
+            "action_required": (
+                "run Codex once to create its log home or correct CODEX_HOME"
+                if codex_home_unavailable
+                else None
+            ),
             "claude_session_end": "manual-verification" if claude_ready else "not-selected",
             "trigger_parity_claimed": False,
         },
@@ -964,16 +985,17 @@ def _resolve_lectern_root(explicit: Path | None) -> Path | None:
         candidates.append(explicit)
     else:
         configured = os.environ.get("SCRIPTORIUM_LECTERN_ROOT")
-        if configured:
+        if configured and configured.strip():
             candidates.append(Path(configured))
-        source_parent = Path(__file__).resolve().parents[2].parent
-        candidates.extend(
-            [
-                source_parent / "Academic-Slides-Agent",
-                Path.cwd() / "Academic-Slides-Agent",
-                Path.cwd().parent / "Academic-Slides-Agent",
-            ]
-        )
+        else:
+            source_parent = Path(__file__).resolve().parents[2].parent
+            candidates.extend(
+                [
+                    source_parent / "Academic-Slides-Agent",
+                    Path.cwd() / "Academic-Slides-Agent",
+                    Path.cwd().parent / "Academic-Slides-Agent",
+                ]
+            )
     for candidate in candidates:
         try:
             root = candidate.expanduser().resolve()
@@ -1289,8 +1311,14 @@ def format_doctor_report(report: dict[str, Any]) -> str:
             "Network: no suite-managed action requested; "
             "OS-level subprocess egress not observed"
         ),
-        "",
     ]
+    selection_lines = format_path_selection(
+        report,
+        conflict_guidance="review the selected environment values.",
+    )
+    if selection_lines:
+        lines.extend(["", *selection_lines])
+    lines.append("")
     for check in report["checks"]:
         lines.append(
             f"{STATUS_LABELS[check['status']]:<5} {check['id']:<30} {check['summary']}"
@@ -1313,7 +1341,9 @@ def format_doctor_report(report: dict[str, Any]) -> str:
             "",
             (
                 f"Result: {report['status'].upper()} -- "
-                f"{report['summary']['fail']} failed, {report['summary']['warn']} warnings, "
+                f"{report['summary']['fail']} failed, "
+                f"{report['summary']['warn']} check warnings, "
+                f"{len(report.get('warnings', []))} path-selection warnings, "
                 f"{report['summary']['info']} informational, "
                 f"{report['summary']['manual']} manual"
             ),

@@ -124,16 +124,17 @@ def resolve_component_root(component: str, explicit: Path | None = None) -> Path
         candidates.append(explicit)
     else:
         configured = os.environ.get(COMPONENT_ENVS[component])
-        if configured:
+        if configured and configured.strip():
             candidates.append(Path(configured))
-        source_parent = _source_root().parent
-        candidates.extend(
-            [
-                source_parent / COMPONENT_DIRS[component],
-                Path.cwd() / COMPONENT_DIRS[component],
-                Path.cwd().parent / COMPONENT_DIRS[component],
-            ]
-        )
+        else:
+            source_parent = _source_root().parent
+            candidates.extend(
+                [
+                    source_parent / COMPONENT_DIRS[component],
+                    Path.cwd() / COMPONENT_DIRS[component],
+                    Path.cwd().parent / COMPONENT_DIRS[component],
+                ]
+            )
     for candidate in candidates:
         resolved = candidate.expanduser().resolve()
         if (resolved / "pyproject.toml").is_file():

@@ -9,6 +9,7 @@ from pathlib import Path
 from unittest import mock
 
 from scriptorium import cli
+from scriptorium.demo import DemoError
 from scriptorium.host import run_host_install
 from scriptorium.pull import (
     ENTRY_LIMITATIONS,
@@ -123,6 +124,9 @@ class PullTests(unittest.TestCase):
             self.assertNotIn("--run", invoke.call_args.args[0])
             self.assertEqual(invoke.call_args.kwargs["timeout"], 60)
             self.assertEqual(report["mode"], "preview")
+            self.assertFalse(report["entry"]["codex_selected"])
+            self.assertEqual(report["status"], "planned")
+            self.assertEqual(report["action_required"], [])
 
     def test_codex_home_is_forwarded_as_the_scan_root(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -154,6 +158,49 @@ class PullTests(unittest.TestCase):
                 command[command.index("--codex-home") + 1], str(codex_home.resolve())
             )
             self.assertEqual(report["entry"]["codex_home_source"], "CODEX_HOME")
+            self.assertEqual(report["entry"]["codex_home_state"], "ready")
+
+    def test_missing_codex_home_reports_zero_session_setup_without_creating_it(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            workspace = root / "workspace"
+            home = root / "provenance-home"
+            missing_codex_home = root / "missing-codex-home"
+            workspace.mkdir()
+            home.mkdir()
+            run_host_install(workspace=workspace, host="codex")
+            result = component_report(status="noop")
+            result["summary"]["codex_found"] = 0
+            with (
+                mock.patch.dict(
+                    os.environ,
+                    {"CODEX_HOME": str(missing_codex_home)},
+                    clear=False,
+                ),
+                mock.patch(
+                    "scriptorium.pull._resolve_provenance",
+                    return_value=(None, Path("prov-sync-pull")),
+                ),
+                mock.patch(
+                    "scriptorium.pull.subprocess.run",
+                    return_value=completed(result),
+                ) as invoke,
+            ):
+                report = run_pull(workspace=workspace, provenance_home=home)
+
+            command = invoke.call_args.args[0]
+            self.assertNotIn("--scan-codex", command)
+            self.assertNotIn("--codex-home", command)
+            self.assertFalse(missing_codex_home.exists())
+            self.assertEqual(report["status"], "action-required")
+            self.assertEqual(report["summary"]["codex_found"], 0)
+            self.assertTrue(report["entry"]["codex_selected"])
+            self.assertFalse(report["entry"]["scan_codex"])
+            self.assertEqual(report["entry"]["codex_home_state"], "missing")
+            self.assertIn(
+                {"type": "codex-home-setup", "count": 1},
+                report["action_required"],
+            )
 
     def test_codex_home_expands_environment_variables_and_whitespace(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -195,11 +242,18 @@ class PullTests(unittest.TestCase):
             root = Path(temporary)
             workspace = root / "workspace"
             home = root / "provenance-home"
+            profile = root / "profile"
+            codex_home = profile / ".codex"
             workspace.mkdir()
             home.mkdir()
+            codex_home.mkdir(parents=True)
             run_host_install(workspace=workspace, host="codex")
             with (
-                mock.patch.dict(os.environ, {"CODEX_HOME": "   "}, clear=False),
+                mock.patch.dict(
+                    os.environ,
+                    {"CODEX_HOME": "   ", "USERPROFILE": str(profile)},
+                    clear=True,
+                ),
                 mock.patch(
                     "scriptorium.pull._resolve_provenance",
                     return_value=(None, Path("prov-sync-pull")),
@@ -211,8 +265,72 @@ class PullTests(unittest.TestCase):
             ):
                 report = run_pull(workspace=workspace, provenance_home=home)
 
-            self.assertNotIn("--codex-home", invoke.call_args.args[0])
+            command = invoke.call_args.args[0]
+            self.assertEqual(
+                command[command.index("--codex-home") + 1],
+                str(codex_home.resolve()),
+            )
             self.assertEqual(report["entry"]["codex_home_source"], "profile-default")
+
+    def test_missing_profile_default_skips_scan_and_requests_setup(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            workspace = root / "workspace"
+            home = root / "provenance-home"
+            profile = root / "profile"
+            workspace.mkdir()
+            home.mkdir()
+            profile.mkdir()
+            run_host_install(workspace=workspace, host="codex")
+            result = component_report(status="noop")
+            result["summary"]["codex_found"] = 0
+            with (
+                mock.patch.dict(
+                    os.environ,
+                    {"CODEX_HOME": "   ", "USERPROFILE": str(profile)},
+                    clear=True,
+                ),
+                mock.patch(
+                    "scriptorium.pull._resolve_provenance",
+                    return_value=(None, Path("prov-sync-pull")),
+                ),
+                mock.patch(
+                    "scriptorium.pull.subprocess.run",
+                    return_value=completed(result),
+                ) as invoke,
+            ):
+                report = run_pull(workspace=workspace, provenance_home=home)
+
+            command = invoke.call_args.args[0]
+            self.assertNotIn("--scan-codex", command)
+            self.assertNotIn("--codex-home", command)
+            self.assertEqual(report["entry"]["codex_home_state"], "missing")
+            self.assertEqual(report["status"], "action-required")
+            self.assertIn(
+                {"type": "codex-home-setup", "count": 1},
+                report["action_required"],
+            )
+
+    def test_invalid_provenance_environment_root_does_not_fall_back_to_path(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            missing = Path(temporary) / "missing-provenance"
+            with (
+                mock.patch.dict(
+                    os.environ,
+                    {"SCRIPTORIUM_PROVENANCE_ROOT": str(missing)},
+                    clear=False,
+                ),
+                mock.patch(
+                    "scriptorium.pull.resolve_component_root",
+                    side_effect=DemoError("not found"),
+                ),
+                mock.patch("scriptorium.pull.shutil.which") as installed,
+            ):
+                with self.assertRaisesRegex(
+                    PullError, "configured Provenance root is unavailable"
+                ):
+                    _resolve_provenance(None, expected_version="0.17.0")
+            installed.assert_not_called()
 
     def test_environment_is_narrow_and_raw_stderr_is_suppressed(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -255,11 +373,13 @@ class PullTests(unittest.TestCase):
             tempfile.TemporaryDirectory() as temporary,
             mock.patch("scriptorium.pull.subprocess.run") as invoke,
         ):
-            with self.assertRaisesRegex(PullError, "workspace does not exist"):
+            missing = Path(temporary) / "missing-private-name"
+            with self.assertRaisesRegex(PullError, "workspace does not exist") as raised:
                 run_pull(
-                    workspace=Path(temporary) / "missing",
+                    workspace=missing,
                     provenance_home=Path(temporary),
                 )
+            self.assertNotIn(str(missing), str(raised.exception))
             invoke.assert_not_called()
 
     def test_provenance_home_and_workspace_must_not_overlap(self):
@@ -541,6 +661,11 @@ class PullTests(unittest.TestCase):
         unknown_action = component_report()
         unknown_action["action_required"] = [{"type": "private-action", "count": 1}]
 
+        wrapper_only_action = component_report()
+        wrapper_only_action["action_required"] = [
+            {"type": "codex-home-setup", "count": 1}
+        ]
+
         missing_action_count = component_report()
         missing_action_count["action_required"] = [{"type": "agent-fill"}]
 
@@ -556,6 +681,7 @@ class PullTests(unittest.TestCase):
             invalid_stage_status,
             invalid_stage_count,
             unknown_action,
+            wrapper_only_action,
             missing_action_count,
             unknown_error,
             incompatible_egress,
@@ -584,10 +710,25 @@ class PullTests(unittest.TestCase):
             {"code": "private_error", "detail": "secret"},
         ]
         report["limitations"] = ["private limitation"]
+        report["path_selection"] = {
+            "workspace": {
+                "source": "environment",
+                "environment": "SCRIPTORIUM_WORKSPACE",
+                "suite_config_conflict": True,
+            }
+        }
+        report["warnings"] = [
+            {
+                "code": "environment_suite_config_conflict",
+                "path": "workspace",
+            }
+        ]
         rendered = format_pull_report(report)
         self.assertIn("codex_found=1", rendered)
         self.assertIn("Actions: agent-fill=1", rendered)
         self.assertIn("Errors: worker_busy", rendered)
+        self.assertIn("workspace: environment (SCRIPTORIUM_WORKSPACE)", rendered)
+        self.assertIn("pull --run is blocked", rendered)
         self.assertNotIn("secret claim", rendered)
         self.assertNotIn("D:/private", rendered)
         self.assertNotIn("private-action", rendered)

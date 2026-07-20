@@ -17,12 +17,24 @@ from scriptorium.demo import (
     load_compatibility,
     prepare_output,
     project_version,
+    resolve_component_root,
     run_demo,
 )
 from importlib import resources
 
 
 class DemoUnitTests(unittest.TestCase):
+    def test_invalid_component_environment_root_fails_closed(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            missing = Path(temporary) / "missing-spec"
+            with mock.patch.dict(
+                os.environ,
+                {"SCRIPTORIUM_SPEC_ROOT": str(missing)},
+                clear=False,
+            ):
+                with self.assertRaisesRegex(DemoError, "cannot find scriptorium-spec"):
+                    resolve_component_root("scriptorium-spec")
+
     def test_compatibility_manifest_locks_alpha_baseline(self):
         self.assertEqual(
             load_compatibility(),

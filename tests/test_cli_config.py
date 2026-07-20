@@ -70,22 +70,101 @@ class ConfigFallbackCliTests(unittest.TestCase):
             mock.patch.dict(
                 os.environ,
                 {
+                    "SCRIPTORIUM_CONFIG_DIR": str(self.config_root),
                     "SCRIPTORIUM_WORKSPACE": str(env_workspace),
                     "PROVENANCE_HOME": str(env_home),
                 },
-                clear=False,
+                clear=True,
             ),
             mock.patch(
                 "scriptorium.cli.run_pull",
                 return_value={"operation": "pull", "exit_code": 0},
             ) as run,
         ):
-            exit_code, _report = self.invoke_json(["pull", "--json"])
+            exit_code, report = self.invoke_json(["pull", "--json"])
 
         self.assertEqual(exit_code, 0)
         self.assertEqual(run.call_args.kwargs["workspace"], env_workspace)
         self.assertEqual(run.call_args.kwargs["provenance_home"], env_home)
         self.assertIsNone(run.call_args.kwargs["project"])
+        self.assertEqual(
+            report["path_selection"]["workspace"]["source"], "environment"
+        )
+        self.assertEqual(
+            report["path_selection"]["data_root"]["environment"],
+            "PROVENANCE_HOME",
+        )
+        self.assertEqual(
+            {warning["path"] for warning in report["warnings"]},
+            {"workspace", "data_root"},
+        )
+        self.assertNotIn(str(env_workspace), json.dumps(report))
+        self.assertNotIn(str(env_home), json.dumps(report))
+
+    def test_pull_run_fails_closed_on_environment_config_conflict(self):
+        env_workspace = self.root / "environment workspace"
+        env_home = self.root / "environment provenance"
+        env_workspace.mkdir()
+        env_home.mkdir()
+        with (
+            mock.patch.dict(
+                os.environ,
+                {
+                    "SCRIPTORIUM_CONFIG_DIR": str(self.config_root),
+                    "SCRIPTORIUM_WORKSPACE": str(env_workspace),
+                    "PROVENANCE_HOME": str(env_home),
+                },
+                clear=True,
+            ),
+            mock.patch("scriptorium.cli.run_pull") as run,
+        ):
+            exit_code, report = self.invoke_json(["pull", "--run", "--json"])
+
+        self.assertEqual(exit_code, 2)
+        run.assert_not_called()
+        self.assertEqual(report["mode"], "run")
+        self.assertEqual(
+            {warning["path"] for warning in report["warnings"]},
+            {"workspace", "data_root"},
+        )
+
+    def test_pull_run_accepts_explicit_roots_despite_conflicting_environment(self):
+        explicit_workspace = self.root / "explicit workspace"
+        explicit_home = self.root / "explicit provenance"
+        explicit_workspace.mkdir()
+        explicit_home.mkdir()
+        component_report = {"operation": "pull", "exit_code": 0}
+        with (
+            mock.patch.dict(
+                os.environ,
+                {
+                    "SCRIPTORIUM_WORKSPACE": str(self.root / "environment workspace"),
+                    "PROVENANCE_HOME": str(self.root / "environment provenance"),
+                },
+                clear=True,
+            ),
+            mock.patch(
+                "scriptorium.cli.run_pull", return_value=component_report
+            ) as run,
+        ):
+            exit_code, report = self.invoke_json(
+                [
+                    "pull",
+                    "--config-dir",
+                    str(self.config_root),
+                    "--workspace",
+                    str(explicit_workspace),
+                    "--provenance-home",
+                    str(explicit_home),
+                    "--run",
+                    "--json",
+                ]
+            )
+
+        self.assertEqual(exit_code, 0)
+        self.assertTrue(run.call_args.kwargs["run"])
+        self.assertEqual(report["warnings"], [])
+        self.assertEqual(report["path_selection"]["workspace"]["source"], "cli")
 
     def test_blank_environment_paths_do_not_block_config_fallback(self):
         component_report = {"operation": "pull", "exit_code": 0}
@@ -102,7 +181,7 @@ class ConfigFallbackCliTests(unittest.TestCase):
             ),
             mock.patch("scriptorium.cli.run_pull", return_value=component_report) as run,
         ):
-            exit_code, _report = self.invoke_json(["pull", "--json"])
+            exit_code, report = self.invoke_json(["pull", "--json"])
 
         self.assertEqual(exit_code, 0)
         self.assertEqual(run.call_args.kwargs["workspace"], self.workspace.resolve())
@@ -110,6 +189,42 @@ class ConfigFallbackCliTests(unittest.TestCase):
             run.call_args.kwargs["provenance_home"], self.provenance_home.resolve()
         )
         self.assertEqual(run.call_args.kwargs["project"], "configured-project")
+        self.assertEqual(
+            report["path_selection"]["workspace"]["source"], "suite-config"
+        )
+        self.assertEqual(report["warnings"], [])
+
+    def test_doctor_warns_when_environment_and_suite_config_disagree(self):
+        env_workspace = self.root / "doctor environment workspace"
+        env_home = self.root / "doctor environment provenance"
+        env_workspace.mkdir()
+        env_home.mkdir()
+        with (
+            mock.patch.dict(
+                os.environ,
+                {
+                    "SCRIPTORIUM_CONFIG_DIR": str(self.config_root),
+                    "SCRIPTORIUM_WORKSPACE": str(env_workspace),
+                    "PROVENANCE_HOME": str(env_home),
+                },
+                clear=True,
+            ),
+            mock.patch(
+                "scriptorium.cli.run_doctor",
+                return_value={"operation": "doctor", "exit_code": 1},
+            ),
+        ):
+            exit_code, report = self.invoke_json(["doctor", "--json"])
+
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(
+            {warning["path"] for warning in report["warnings"]},
+            {"workspace", "data_root"},
+        )
+        self.assertEqual(
+            report["path_selection"]["provenance_root"]["source"],
+            "auto-discovery",
+        )
 
     def test_single_workspace_override_does_not_reuse_configured_project(self):
         other_workspace = self.root / "other workspace"

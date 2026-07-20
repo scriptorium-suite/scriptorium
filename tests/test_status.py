@@ -92,6 +92,24 @@ class StatusTests(unittest.TestCase):
         self.assertFalse(pull_mock.call_args.kwargs["run"])
         self.assertEqual(pull_mock.call_args.kwargs["project"], "configured-project")
 
+    def test_missing_codex_home_is_attention_not_an_internal_error(self):
+        report, _pull_mock = self.run_with(
+            doctor_report(),
+            pull_report(
+                status="action-required",
+                counts={"codex_found": 0},
+                actions=[{"type": "codex-home-setup", "count": 1}],
+            ),
+        )
+
+        self.assertEqual(report["status"], "attention")
+        self.assertEqual(report["exit_code"], 0)
+        self.assertEqual(report["freshness"]["state"], "review-required")
+        self.assertIn(
+            {"type": "codex-home-setup", "count": 1},
+            report["action_required"],
+        )
+
     def test_pending_change_is_attention_and_only_suggests_reviewing_pull(self):
         report, _pull_mock = self.run_with(
             doctor_report(),
@@ -294,12 +312,21 @@ class StatusTests(unittest.TestCase):
             doctor_report(),
             pull_report(counts={"pending_fill": 1}),
         )
+        report["path_selection"] = {
+            "workspace": {
+                "source": "suite-config",
+                "environment": None,
+                "suite_config_conflict": False,
+            }
+        }
+        report["warnings"] = []
         rendered = format_status_report(report)
 
         self.assertIn("Overall: ATTENTION", rendered)
         self.assertIn("pending_fill=1", rendered)
         self.assertIn("raw content and local paths suppressed", rendered)
         self.assertIn("external probe side effects not OS-observed", rendered)
+        self.assertIn("workspace: suite-config", rendered)
         self.assertNotIn("configured-project", rendered)
 
 

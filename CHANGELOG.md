@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.0 — Unreleased
+## 0.1.0 — 2026-07-20
 
 - Add `scriptorium inventory`, a deterministic, zero-write preview for explicitly
   selected Markdown/PDF sources, AI conversation exports, and Zotero exports. It
@@ -9,8 +9,10 @@
   It does not discover personal folders, persist a manifest, ingest, copy, or apply
   a migration.
 - Add the first thin suite entry with `scriptorium demo`.
-- Add a credential-free, offline synthetic golden path through the canonical
-  spec validator, Steward review workflow, and Provenance ingest/search/MCP APIs.
+- Add a credential-free synthetic golden path through the canonical spec validator,
+  Steward review workflow, and Provenance ingest/search/MCP APIs. After source
+  installation, the path requests no suite-managed runtime network action; source
+  installation itself may fetch declared build requirements.
 - Add an isolated Markdown workspace, compatibility manifest, machine-readable
   demo report, Windows end-to-end CI, and cross-platform unit tests.
 - Add read-only `doctor` targets for Demo and Public Alpha readiness, with stable
@@ -35,6 +37,12 @@
   identifiers, research content, stderr, or an implicit `--run` authorization.
   It authorizes no suite project/data writes while accurately disclosing external
   readiness probes.
+- Report content-free path-selection provenance across `doctor`, `pull`, and
+  `status`; warn when environment roots conflict with suite config and fail closed
+  before `pull --run` unless explicit CLI roots remove the ambiguity. Treat a
+  configured but missing `CODEX_HOME` as zero sessions plus setup remediation,
+  without creating the directory. Explicit component-root environment variables
+  also fail closed instead of silently falling back to a different checkout.
 - Preserve local home and temporary-directory variables in the secret-stripped
   diagnostic subprocess environment so installed Windows Provenance entries can
   resolve their profile without inheriting provider credentials.

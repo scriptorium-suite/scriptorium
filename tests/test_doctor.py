@@ -23,6 +23,7 @@ from scriptorium.doctor import (
     _project_metadata,
     _provenance_home_check,
     _provenance_runtime_version,
+    _resolve_lectern_root,
     _run_probe,
     _workspace_check,
     format_doctor_report,
@@ -213,17 +214,44 @@ class DoctorReportTests(unittest.TestCase):
             ),
             *capability_checks(target=target),
         ]
-        rendered = format_doctor_report(_build_report(target, checks, []))
+        report = _build_report(target, checks, [])
+        report["path_selection"] = {
+            "data_root": {
+                "source": "environment",
+                "environment": "PROVENANCE_HOME",
+                "suite_config_conflict": True,
+            }
+        }
+        report["warnings"] = [
+            {
+                "code": "environment_suite_config_conflict",
+                "path": "data_root",
+            }
+        ]
+        rendered = format_doctor_report(report)
         self.assertIn("FAIL  host.adapter", rendered)
         self.assertIn("Fix: install adapter", rendered)
         self.assertIn("Next: Install only if desired.", rendered)
         self.assertIn("Public Alpha readiness: INCOMPLETE", rendered)
         self.assertIn("Not tested:", rendered)
         self.assertIn("local filesystem paths", rendered)
+        self.assertIn("data_root: environment (PROVENANCE_HOME)", rendered)
+        self.assertIn("WARNING:", rendered)
+        self.assertIn("1 path-selection warnings", rendered)
         self.assertNotIn("\x1b", rendered)
 
 
 class DoctorProbeTests(unittest.TestCase):
+    def test_invalid_lectern_environment_root_fails_closed(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            missing = Path(temporary) / "missing-lectern"
+            with mock.patch.dict(
+                os.environ,
+                {"SCRIPTORIUM_LECTERN_ROOT": str(missing)},
+                clear=False,
+            ):
+                self.assertIsNone(_resolve_lectern_root(None))
+
     def test_probe_environment_does_not_inherit_provider_secret(self):
         with mock.patch.dict(os.environ, {"OPENAI_API_KEY": "secret-sentinel"}):
             output = _run_probe(
@@ -577,8 +605,37 @@ class DoctorProbeTests(unittest.TestCase):
         self.assertEqual(configured_location["source"], "CODEX_HOME")
         self.assertEqual(Path(configured_location["root"]), configured.resolve())
         self.assertTrue(configured_location["sessions_exist"])
-        self.assertEqual(default_location["source"], "USERPROFILE")
+        self.assertEqual(default_location["source"], "profile-default")
         self.assertEqual(Path(default_location["root"]), (profile / ".codex").resolve())
+        self.assertEqual(default_location["state"], "missing")
+        self.assertEqual(
+            default_check["details"]["codex_scan"], "home-unavailable"
+        )
+        self.assertIsNotNone(default_check["details"]["action_required"])
+
+    def test_missing_codex_home_is_an_actionable_zero_session_state(self):
+        codex = _check(
+            "host.adapter",
+            target="public-alpha",
+            required_for=("public-alpha",),
+            passed=True,
+            summary="ready",
+            details={"ready_hosts": ["codex"]},
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            missing = Path(temporary) / "missing-codex-home"
+            with mock.patch.dict(
+                os.environ, {"CODEX_HOME": str(missing)}, clear=True
+            ):
+                capture = _agent_capture_check("public-alpha", codex)
+
+            self.assertEqual(capture["status"], "pass")
+            self.assertEqual(
+                capture["details"]["codex_scan"], "configured-home-missing"
+            )
+            self.assertIn("zero sessions", capture["summary"])
+            self.assertIsNotNone(capture["details"]["action_required"])
+            self.assertFalse(missing.exists())
 
     def test_pull_requires_a_compatible_public_capability_probe(self):
         public = _entry_pull_check("public-alpha", None)

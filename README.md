@@ -1,20 +1,24 @@
 # Scriptorium
 
-> **Public Alpha candidate:** the umbrella repository ships safe initialization for
+> **Public Alpha v0.1.0:** the umbrella repository ships safe initialization for
 > a real project, one synthetic vertical slice through `scriptorium demo`, the
 > read-only `scriptorium doctor`, a content-free `scriptorium status` control-plane
 > summary, a zero-write `scriptorium inventory` preview for explicitly selected
 > local sources,
 > and explicit project-scoped Codex and Claude Code skill installers. It also ships
 > the accepted on-demand `scriptorium pull` entry through Provenance's
-> machine-readable public command. Clean-machine release validation is still pending.
+> machine-readable public command. GitHub-hosted clean Windows CI and an isolated
+> Windows source-install acceptance run pass; live Agent-host parity and Lectern
+> remain outside the credential-free golden path.
 
 Scriptorium is a local-first, agent-native research workflow suite. This repository
 is its thin control plane: it coordinates independently useful components through
 public commands and versioned files without importing their internals or owning
 their research data.
 
-[中文说明](README.zh.md) · [Contract source of truth](https://github.com/scriptorium-suite/scriptorium-spec) · [Steward](https://github.com/scriptorium-suite/steward) · [Provenance](https://github.com/foxsplendid/Provenance) · [Design inspirations](ACKNOWLEDGEMENTS.md)
+[中文说明](README.zh.md) · [中文产品案例](docs/case-study.zh-CN.md) · [Showcase evidence](docs/showcase/README.zh-CN.md) · [Contract source of truth](https://github.com/scriptorium-suite/scriptorium-spec) · [Design inspirations](ACKNOWLEDGEMENTS.md)
+
+![Scriptorium Public Alpha synthetic golden-path evidence](docs/showcase/demo-poster.svg)
 
 ## What works now
 
@@ -27,6 +31,15 @@ init does not request network access or read provider credentials. After init,
 `host install`, `doctor`, `status`, and `pull` can resolve their workspace/data
 selection from the suite config when higher-precedence CLI flags or environment
 variables are absent.
+
+`doctor`, `status`, and `pull` report whether each root came from the CLI,
+environment, suite config, or auto-discovery. `status` and `pull` reports
+do not echo selected paths; `doctor` is a detailed local diagnostic and its report
+contains resolved paths, so review it before sharing. When an environment root
+differs from suite config they emit a visible warning; `pull --run` then fails closed
+until the user supplies explicit CLI roots. A selected but unavailable Codex log home
+is treated as zero sessions plus an actionable setup cue, not as an internal error,
+and the directory is never created implicitly.
 
 `scriptorium demo` creates an isolated Markdown workspace and runs a synthetic
 AI4Science literature workflow through the real public interfaces:
@@ -43,7 +56,7 @@ Once the source checkouts are installed, this demo path is designed to operate
 without a network action. It does not call a live model: the agent-written draft
 is an explicitly labelled synthetic fixture. The report states that network
 behavior is policy-constrained rather than observed by an OS-level sandbox.
-Passing this demo proves deterministic component integration, not full Public
+Passing this demo proves functionally repeatable component integration, not full Public
 Alpha readiness or scientific validity.
 
 `scriptorium doctor` separately checks installation and capability readiness. It
@@ -109,6 +122,11 @@ python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install --no-deps -e ..\steward
 .\.venv\Scripts\python.exe -m pip install --no-deps -e ..\Provenance
 ```
+
+Depending on the local Python environment, editable installation may contact the
+configured package index to obtain declared build requirements such as
+`setuptools>=68`. The no-runtime-network statement applies only after source
+installation is complete; it is not an offline-install guarantee.
 
 ### Optional: preview existing local sources
 
@@ -242,8 +260,8 @@ scriptorium demo
 ```
 
 Re-running against an output directory carrying the Scriptorium demo marker is
-idempotent. A non-empty directory without that marker is rejected and never
-overwritten.
+functionally idempotent. Timestamp-bearing generated records may differ byte for
+byte. A non-empty directory without that marker is rejected and never overwritten.
 
 ## Agent host adapters
 
@@ -379,23 +397,25 @@ the current report.
 
 ## Compatibility baseline
 
-The first golden path intentionally locks exact source versions:
+The first golden path intentionally locks exact source versions as its coordinated
+Public Alpha release targets:
 
-- `scriptorium-spec` 2.2.0 release candidate
-- Steward 0.2.0 unreleased
+- `scriptorium-spec` 2.2.0
+- Steward 0.2.0
 - Provenance 0.17.0
 
-This source-based constraint is temporary and explicit. Tagged releases and a
-range-based compatibility policy belong to the later Public Alpha release step.
+The demo and CI workflows continue to pin exact component commits. A range-based
+compatibility policy is intentionally deferred until external Alpha usage provides
+evidence for safe ranges.
 
 ## Next product increments
 
 1. add a compact project context-capsule/resume entry over Provenance MCP, distinct
    from the content-free control-plane `status`;
-2. add uniform side-effect-free version probes and profile compatibility facts;
-3. add an explicitly reviewed, adapter-specific migration manifest and apply path;
-4. add schema-driven cross-repository E2E for Lectern handoff;
-5. verify installation and the golden path on a clean Windows environment;
-6. align screenshots, release notes, tags, and compatibility ranges for Public Alpha.
+2. add an explicitly reviewed, adapter-specific migration manifest and apply path;
+3. add schema-driven cross-repository E2E for Lectern handoff;
+4. verify live Claude Code `SessionEnd` parity with the Codex capture path;
+5. run an external-user Alpha and use the evidence to shape packaging and
+   compatibility ranges.
 
 Apache-2.0. No telemetry.

@@ -1,0 +1,80 @@
+{
+  "format_version": 1,
+  "evidence_type": "scriptorium-public-alpha-synthetic-demo",
+  "evidence_state": "local-release-candidate",
+  "observed_on": "2026-07-20",
+  "source": {
+    "repository": "scriptorium-suite/scriptorium",
+    "commit": null,
+    "workflow_run": null,
+    "runner": "isolated Windows local acceptance",
+    "python": "3.12.3",
+    "remote_ci_status": "pending sanitized-root replacement"
+  },
+  "components": {
+    "scriptorium": {
+      "version": "0.1.0",
+      "commit": null,
+      "state": "verified working tree"
+    },
+    "scriptorium-spec": {
+      "version": "2.2.0",
+      "commit": "66bfefea93758231491fadc4694708d1b8107ea0",
+      "history": "parentless sanitized root"
+    },
+    "steward": {
+      "version": "0.2.0",
+      "commit": "21e4e454fb97702bc5f31c24b805cf3c9489bc31"
+    },
+    "provenance": {
+      "version": "0.17.0",
+      "commit": "910efbc47e604c51314866174581cfdd7eac47b6"
+    },
+    "lectern": {
+      "version": "pre-release",
+      "commit": "bb461db4a5eee3d5ed37f52a7f6c2c3e4203df42",
+      "history": "parentless sanitized root",
+      "invoked_by_demo": false
+    }
+  },
+  "evidence": {
+    "demo_report": {
+      "path": "evidence/demo-report.json",
+      "source_sha256": "0d03e735238b864b502063153549cb97b47a993e18daf01140c10a5c7b0e2093",
+      "snapshot_sha256": "0d03e735238b864b502063153549cb97b47a993e18daf01140c10a5c7b0e2093"
+    },
+    "windows_acceptance": {
+      "path": "evidence/windows-uat-summary.json",
+      "snapshot_sha256": "33fbcb398a7b663d368e6c55a64cd80f35721d9fa02211cbb2587a12f7086559"
+    },
+    "derived_visual": {
+      "path": "demo-poster.svg",
+      "claims": [
+        "three runtime component versions matched",
+        "nine stages exited zero",
+        "six assertions passed",
+        "no credentials requested"
+      ]
+    }
+  },
+  "privacy": {
+    "synthetic_only": true,
+    "private_data_used": false,
+    "live_model_invoked": false,
+    "provider_credentials_requested": false,
+    "private_paths_present": false,
+    "history_path_email_secret_scan_passed": true,
+    "os_network_isolation_observed": false
+  },
+  "release_blockers": [
+    "Replace the public main roots for scriptorium-spec and Lectern only after explicit approval.",
+    "Re-run GitHub-hosted Windows CI from the sanitized component commits.",
+    "Replace this local candidate source block with the final umbrella commit and workflow run."
+  ],
+  "limitations": [
+    "The evidence verifies a credential-free synthetic integration path, not scientific validity.",
+    "Codex and Claude Code hosts were not invoked by the demo.",
+    "Lectern was not invoked by the demo.",
+    "Network and filesystem isolation were policy-constrained, not observed by an OS-level sandbox."
+  ]
+}

@@ -1,17 +1,20 @@
 # Scriptorium
 
-> **Public Alpha 候选版：** 当前 umbrella 仓库已交付真实项目的安全初始化、一个
+> **Public Alpha v0.1.0：** 当前 umbrella 仓库已交付真实项目的安全初始化、一个
 > 通过 `scriptorium demo` 跑通的合成纵向切片、只读诊断入口 `scriptorium doctor`、
 > 不暴露内容的 `scriptorium status` 控制面状态摘要、仅盘点显式本地来源且零写入的
 > `scriptorium inventory` 预览，以及显式、项目级的 Codex /
 > Claude Code 技能安装器。已确认的按需入口 `scriptorium pull` 也已通过 Provenance
-> 的机器可读公共命令交付；干净机器发布验收仍待完成。
+> 的机器可读公共命令交付。GitHub-hosted 干净 Windows CI 与隔离的 Windows 源码
+> 安装验收已通过；Agent host 实时对等路径与 Lectern 仍不属于无凭据黄金路径。
 
 Scriptorium 是面向科研工作者的本地优先、Agent 原生研究工作流套件。本仓库是
 它的薄控制面：通过公开 CLI 与版本化文件编排可独立使用的组件，不导入组件内部
 模块，也不成为论文库、项目笔记或科研记忆的新数据主库。
 
-[English](README.md) · [契约单一事实源](https://github.com/scriptorium-suite/scriptorium-spec) · [Steward](https://github.com/scriptorium-suite/steward) · [Provenance](https://github.com/foxsplendid/Provenance) · [设计借鉴与致谢](ACKNOWLEDGEMENTS.zh.md)
+[English](README.md) · [中文产品案例](docs/case-study.zh-CN.md) · [展示与证据](docs/showcase/README.zh-CN.md) · [契约单一事实源](https://github.com/scriptorium-suite/scriptorium-spec) · [设计借鉴与致谢](ACKNOWLEDGEMENTS.zh.md)
+
+![Scriptorium Public Alpha 合成黄金路径证据](docs/showcase/demo-poster.svg)
 
 ## 当前真正可用的内容
 
@@ -22,6 +25,13 @@ Markdown workspace 与 Provenance 数据根目录，以及一份有效的 `proje
 读取 provider 凭据。初始化后，如果没有更高优先级的 CLI 参数或环境变量，
 `host install`、`doctor`、`status` 和 `pull` 可以从套件配置解析相应的
 workspace、数据根与项目选择。
+
+`doctor`、`status` 和 `pull` 会说明各根目录来自 CLI、环境变量、套件配置还是自动发现。
+`status` 与 `pull` 报告不会回显实际路径；`doctor` 是详细的本地诊断，其报告包含
+已解析路径，分享前必须审阅。若环境变量选择与套件配置不一致，命令会显示显著警告；
+`pull --run` 将 fail closed，直到用户用显式 CLI 根目录消除歧义。所选 Codex 日志目录
+不可用时，会被视为“0 个会话 + 可执行的设置提示”，而不是内部错误；套件也不会隐式
+创建该目录。
 
 `scriptorium demo` 会建立一个隔离的 Markdown 工作区，并通过真实公开接口跑通
 一条合成 AI4Science 文献工作流：
@@ -90,6 +100,10 @@ python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install --no-deps -e ..\steward
 .\.venv\Scripts\python.exe -m pip install --no-deps -e ..\Provenance
 ```
+
+根据本地 Python 环境，editable 安装可能访问已配置的包索引以取得
+`setuptools>=68` 等声明的构建依赖。“运行期不申请网络动作”只适用于源码安装完成后，
+不代表离线安装保证。
 
 ### 可选：预览已有本地资料
 
@@ -212,8 +226,8 @@ scriptorium doctor --target demo
 scriptorium demo
 ```
 
-对带有 Scriptorium demo 标记的目录重复运行是幂等的；非空但没有该标记的目录
-会被拒绝，不会覆盖用户文件。
+对带有 Scriptorium demo 标记的目录重复运行在功能上是幂等的；带摄取时间戳的生成记录
+可能不会逐字节一致。非空但没有该标记的目录会被拒绝，不会覆盖用户文件。
 
 ## Agent 宿主适配
 
@@ -336,21 +350,21 @@ scriptorium-demo/
 
 ## 当前兼容基线
 
-- `scriptorium-spec` 2.2.0 release candidate
-- Steward 0.2.0 unreleased
+- `scriptorium-spec` 2.2.0
+- Steward 0.2.0
 - Provenance 0.17.0
 
-首个 golden path 暂时锁定精确源码版本，这是主动暴露的 Alpha 约束。正式 tag 与
-版本范围兼容策略留到 Public Alpha 发布阶段完成。
+首个 golden path 将以上版本作为协同 Public Alpha 的发布目标，并在 demo 与 CI 中
+继续固定精确组件提交。版本范围兼容策略暂不靠猜测定义，而是在获得外部 Alpha
+使用证据后再确定。
 
 ## 紧邻的产品增量
 
 1. 在 Provenance MCP 之上增加精炼的项目 context-capsule/resume 入口，并与不暴露
    内容的控制面 `status` 明确区分；
-2. 为组件增加统一、无副作用的版本探针与 profile 兼容事实；
-3. 增加需要显式人审的适配器级迁移清单与执行路径；
-4. 补齐 Lectern handoff 的 schema 驱动跨仓 E2E；
-5. 在干净 Windows 环境完成首装和 golden path 验收；
-6. 对齐 Public Alpha 的截图、发布说明、tag 与兼容版本范围。
+2. 增加需要显式人审的适配器级迁移清单与执行路径；
+3. 补齐 Lectern handoff 的 schema 驱动跨仓 E2E；
+4. 验证 Claude Code `SessionEnd` 与 Codex 捕获路径的实时对等性；
+5. 开展外部用户 Alpha，用实测结果决定安装打包与兼容版本范围。
 
 Apache-2.0，无遥测。
