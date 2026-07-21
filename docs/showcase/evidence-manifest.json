@@ -1,21 +1,22 @@
 {
   "format_version": 1,
   "evidence_type": "scriptorium-public-alpha-synthetic-demo",
-  "evidence_state": "local-release-candidate",
-  "observed_on": "2026-07-20",
+  "evidence_state": "remote-ci-verified-release-candidate",
+  "observed_on": "2026-07-21",
   "source": {
     "repository": "scriptorium-suite/scriptorium",
-    "commit": "b0e1a14757f7091173d66ac903dfb5e77eeb5bb4",
-    "workflow_run": null,
-    "runner": "isolated Windows local acceptance",
-    "python": "3.12.3",
-    "remote_ci_status": "pending sanitized-root replacement"
+    "commit": "8069cbf1a2de4b31e8239740368799ff9519294e",
+    "workflow_run": 29818934741,
+    "workflow_run_url": "https://github.com/scriptorium-suite/scriptorium/actions/runs/29818934741",
+    "runner": "GitHub Actions windows-latest (pull_request)",
+    "python": "3.12",
+    "remote_ci_status": "passed"
   },
   "components": {
     "scriptorium": {
       "version": "0.1.0",
-      "commit": "b0e1a14757f7091173d66ac903dfb5e77eeb5bb4",
-      "state": "verified local commit"
+      "commit": "8069cbf1a2de4b31e8239740368799ff9519294e",
+      "state": "verified remote commit"
     },
     "scriptorium-spec": {
       "version": "2.2.0",
@@ -47,6 +48,13 @@
       "path": "evidence/windows-uat-summary.json",
       "snapshot_sha256": "33fbcb398a7b663d368e6c55a64cd80f35721d9fa02211cbb2587a12f7086559"
     },
+    "remote_ci": {
+      "workflow_run": 29818934741,
+      "workflow_run_url": "https://github.com/scriptorium-suite/scriptorium/actions/runs/29818934741",
+      "artifact_id": 8490533423,
+      "artifact_name": "scriptorium-demo-windows",
+      "artifact_demo_report_sha256": "0d03e735238b864b502063153549cb97b47a993e18daf01140c10a5c7b0e2093"
+    },
     "derived_visual": {
       "path": "demo-poster.svg",
       "claims": [
@@ -64,17 +72,18 @@
     "provider_credentials_requested": false,
     "private_paths_present": false,
     "history_path_email_secret_scan_passed": true,
+    "scan_scope": "current public refs, release-candidate tree, and artifact 8490533423",
+    "superseded_commit_object_cleanup_pending": true,
     "os_network_isolation_observed": false
   },
   "release_blockers": [
-    "Replace the public main roots for scriptorium-spec and Lectern only after explicit approval.",
-    "Re-run GitHub-hosted Windows CI from the sanitized component commits.",
-    "Replace this local candidate source block with the final umbrella commit and workflow run."
+    "GitHub Support cleanup remains pending for two superseded commit objects that are no longer referenced by public branches or Actions runs but remain directly addressable by SHA."
   ],
   "limitations": [
     "The evidence verifies a credential-free synthetic integration path, not scientific validity.",
     "Codex and Claude Code hosts were not invoked by the demo.",
     "Lectern was not invoked by the demo.",
-    "Network and filesystem isolation were policy-constrained, not observed by an OS-level sandbox."
+    "Network and filesystem isolation were policy-constrained, not observed by an OS-level sandbox.",
+    "GitHub may retain superseded commit objects until server-side garbage collection and cached-view removal."
   ]
 }
