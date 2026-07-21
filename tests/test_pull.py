@@ -68,13 +68,18 @@ class PullTests(unittest.TestCase):
             root = Path(temporary)
             workspace = root / "workspace"
             home = root / "provenance-home"
+            codex_home = root / "codex-home"
             provenance_root = root / "Provenance"
             workspace.mkdir()
             home.mkdir()
+            codex_home.mkdir()
             provenance_root.mkdir()
             run_host_install(workspace=workspace, host="codex")
             result = component_report(mode="run", status="action-required", exit_code=0)
             with (
+                mock.patch.dict(
+                    os.environ, {"CODEX_HOME": str(codex_home)}, clear=False
+                ),
                 mock.patch(
                     "scriptorium.pull._resolve_provenance",
                     return_value=(provenance_root, Path("prov-sync-pull")),
@@ -92,6 +97,10 @@ class PullTests(unittest.TestCase):
 
             command = invoke.call_args.args[0]
             self.assertIn("--scan-codex", command)
+            self.assertEqual(
+                command[command.index("--codex-home") + 1],
+                str(codex_home.resolve()),
+            )
             self.assertIn("--run", command)
             self.assertIsNone(invoke.call_args.kwargs["timeout"])
             self.assertEqual(command[command.index("--project") + 1], "catalyst")
