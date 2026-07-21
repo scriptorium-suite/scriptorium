@@ -7,6 +7,7 @@ from typing import Any
 
 from . import __version__
 from .doctor import DoctorError, run_doctor
+from .path_selection import format_path_selection
 from .pull import SAFE_ERROR_CODES, PullError, run_pull
 
 
@@ -41,6 +42,7 @@ WORKFLOW_FIELDS = (
 PENDING_FIELDS = WORKFLOW_FIELDS[1:]
 SOURCE_ACTION_TYPES = {
     "run-confirmation",
+    "codex-home-setup",
     "agent-fill",
     "human-approval",
     "workspace-review",
@@ -48,6 +50,7 @@ SOURCE_ACTION_TYPES = {
 }
 ACTION_ORDER = (
     "doctor-remediation",
+    "codex-home-setup",
     "project-resolution",
     "agent-fill",
     "human-approval",
@@ -365,6 +368,7 @@ def run_status(
     needs_review = any(
         action_counts.get(action_type, 0)
         for action_type in (
+            "codex-home-setup",
             "project-resolution",
             "agent-fill",
             "human-approval",
@@ -405,10 +409,18 @@ def format_status_report(report: dict[str, Any]) -> str:
         and isinstance(item.get("count"), int)
         and not isinstance(item.get("count"), bool)
     ]
-    return "\n".join(
-        [
+    lines = [
             f"Scriptorium status {report['generated_by']['version']}",
             f"Overall: {str(report['status']).upper()}",
+    ]
+    lines.extend(
+        format_path_selection(
+            report,
+            conflict_guidance="review the selected environment values.",
+        )
+    )
+    lines.extend(
+        [
             f"Public Alpha readiness: {str(readiness.get('public_alpha', 'unknown')).upper()}",
             f"Literature: {str(readiness.get('literature', 'unknown')).upper()}",
             f"Slides: {str(readiness.get('slides', 'unknown')).upper()}",
@@ -425,3 +437,4 @@ def format_status_report(report: dict[str, Any]) -> str:
             "suppressed; external probe side effects not OS-observed",
         ]
     )
+    return "\n".join(lines)

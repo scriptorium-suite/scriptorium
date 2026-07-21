@@ -1,0 +1,117 @@
+{
+  "format_version": 1,
+  "generated_by": {
+    "name": "scriptorium",
+    "version": "0.1.0"
+  },
+  "demo_status": "passed",
+  "suite_readiness": {
+    "status": "not-verified",
+    "reason_codes": [
+      "agent-host-not-invoked",
+      "lectern-not-invoked"
+    ]
+  },
+  "safety": {
+    "synthetic_data": true,
+    "agent_step": "recorded fixture; no live agent invoked",
+    "credentials_requested": [],
+    "network_policy": "this demo path implements no network action",
+    "network_observation": "not measured by an OS-level sandbox",
+    "config_policy": "documented component homes are redirected under the output root"
+  },
+  "components": {
+    "scriptorium-spec": {
+      "expected_version": "2.2.0",
+      "source_version": "2.2.0",
+      "runtime_version": "2.2.0",
+      "compatibility": "matched"
+    },
+    "steward": {
+      "expected_version": "0.2.0",
+      "source_version": "0.2.0",
+      "runtime_version": "0.2.0",
+      "compatibility": "matched"
+    },
+    "provenance": {
+      "expected_version": "0.17.0",
+      "source_version": "0.17.0",
+      "runtime_version": "0.17.0",
+      "compatibility": "matched"
+    }
+  },
+  "stages": [
+    {
+      "name": "validate library-kb/1.1",
+      "exit_code": 0
+    },
+    {
+      "name": "check Steward version",
+      "exit_code": 0
+    },
+    {
+      "name": "Steward review scaffold",
+      "exit_code": 0
+    },
+    {
+      "name": "Steward review assemble",
+      "exit_code": 0
+    },
+    {
+      "name": "Provenance library ingest",
+      "exit_code": 0
+    },
+    {
+      "name": "Provenance project ingest",
+      "exit_code": 0
+    },
+    {
+      "name": "Provenance search build",
+      "exit_code": 0
+    },
+    {
+      "name": "Provenance literature search",
+      "exit_code": 0
+    },
+    {
+      "name": "Provenance MCP context",
+      "exit_code": 0
+    }
+  ],
+  "assertions": {
+    "contract_validated": true,
+    "steward_topic_boundary": true,
+    "review_assembled": true,
+    "memory_ingested": true,
+    "search_hit_verified": true,
+    "mcp_context_verified": true
+  },
+  "artifacts": [
+    "fixtures/library-kb.v1.1.json",
+    "workspace/Projects/synthetic-catalyst-discovery.md",
+    "workspace/Reviews/ai4science-materials.md",
+    "workspace/Reports/provenance-search.txt",
+    "workspace/Reports/provenance-mcp.jsonl",
+    "provenance/memory/library.json",
+    "provenance/memory/projects.json",
+    "provenance/search-index.db",
+    "demo-report.json"
+  ],
+  "expected_artifacts": [
+    "fixtures/library-kb.v1.1.json",
+    "workspace/Projects/synthetic-catalyst-discovery.md",
+    "workspace/Reviews/ai4science-materials.md",
+    "workspace/Reports/provenance-search.txt",
+    "workspace/Reports/provenance-mcp.jsonl",
+    "provenance/memory/library.json",
+    "provenance/memory/projects.json",
+    "provenance/search-index.db",
+    "demo-report.json"
+  ],
+  "limitations": [
+    "A successful demo does not assert full Public Alpha readiness.",
+    "Codex and Claude Code hosts are not invoked by the credential-free demo.",
+    "Lectern is not invoked because slide generation requires a separately configured provider path.",
+    "Network and filesystem isolation are policy-constrained here, not observed by an OS-level sandbox."
+  ]
+}

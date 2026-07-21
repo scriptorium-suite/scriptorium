@@ -19,6 +19,7 @@ from .demo import (
     resolve_component_root,
 )
 from .host import HostInstallError, inspect_host_installation
+from .path_selection import format_path_selection, resolve_codex_home
 
 
 PULL_PREVIEW_TIMEOUT_SECONDS = 60
@@ -113,6 +114,7 @@ SAFE_ACTION_TYPES = {
     "workspace-review",
     "project-resolution",
 }
+ENTRY_ACTION_TYPES = {"codex-home-setup"}
 SAFE_ERROR_CODES = {
     "invalid_configuration",
     "invalid_sync_jsonl",
@@ -144,11 +146,9 @@ def _resolve_directory(path: Path, *, label: str) -> Path:
     try:
         resolved = requested.resolve(strict=True)
     except (OSError, RuntimeError) as exc:
-        raise PullError(
-            f"{label} does not exist or cannot be resolved: {requested}"
-        ) from exc
+        raise PullError(f"{label} does not exist or cannot be resolved") from exc
     if not resolved.is_dir():
-        raise PullError(f"{label} is not a directory: {requested}")
+        raise PullError(f"{label} is not a directory")
     return resolved
 
 
@@ -162,20 +162,6 @@ def _validate_data_boundary(workspace: Path, provenance_home: Path) -> None:
             "Provenance home and the Markdown workspace must be separate, "
             "non-nested directories because the data root contains protected sync state"
         )
-
-
-def _configured_codex_home() -> Path | None:
-    value = os.environ.get("CODEX_HOME")
-    if not value or not value.strip():
-        return None
-    requested = Path(os.path.expandvars(value.strip())).expanduser()
-    try:
-        resolved = requested.resolve(strict=True)
-    except (OSError, RuntimeError) as exc:
-        raise PullError("CODEX_HOME does not exist or cannot be resolved") from exc
-    if not resolved.is_dir():
-        raise PullError("CODEX_HOME is not a directory")
-    return resolved
 
 
 def _compatibility_version() -> str:
@@ -199,7 +185,12 @@ def _resolve_provenance(
     else:
         try:
             root = resolve_component_root("provenance")
-        except (DemoError, OSError, RuntimeError):
+        except (DemoError, OSError, RuntimeError) as exc:
+            configured = os.environ.get("SCRIPTORIUM_PROVENANCE_ROOT")
+            if configured and configured.strip():
+                raise PullError(
+                    "configured Provenance root is unavailable"
+                ) from exc
             root = None
 
     if root is not None:
@@ -451,8 +442,13 @@ def run_pull(
         provenance_root, expected_version=expected_version
     )
     canonical_hosts = _canonical_hosts(resolved_workspace)
-    scan_codex = "codex" in canonical_hosts
-    codex_home = _configured_codex_home() if scan_codex else None
+    codex_selected = "codex" in canonical_hosts
+    codex_home, codex_home_source, codex_home_state = (
+        resolve_codex_home()
+        if codex_selected
+        else (None, "not-selected", "not-probed")
+    )
+    scan_codex = codex_selected and codex_home_state == "ready"
     mode = "run" if run else "preview"
 
     argv = [
@@ -505,14 +501,25 @@ def run_pull(
         "component_generated_by": producer,
         "expected_component_version": expected_version,
         "canonical_hosts": canonical_hosts,
+        "codex_selected": codex_selected,
         "scan_codex": scan_codex,
-        "codex_home_source": (
-            "CODEX_HOME" if codex_home is not None else "profile-default"
-        ),
+        "codex_home_source": codex_home_source,
+        "codex_home_state": codex_home_state,
         "component_exit_code": completed.returncode,
         "stdout": "parsed-and-suppressed",
         "stderr": "suppressed" if completed.stderr else "empty",
     }
+    if codex_selected and codex_home_state in {
+        "missing",
+        "not-directory",
+        "not-probed",
+    }:
+        report["action_required"] = [
+            *report["action_required"],
+            {"type": "codex-home-setup", "count": 1},
+        ]
+        if report["status"] in {"planned", "noop", "completed"}:
+            report["status"] = "action-required"
     return report
 
 
@@ -530,7 +537,10 @@ def format_pull_report(report: dict[str, Any]) -> str:
     }
     actions = []
     for item in report.get("action_required", []):
-        if not isinstance(item, dict) or item.get("type") not in SAFE_ACTION_TYPES:
+        if (
+            not isinstance(item, dict)
+            or item.get("type") not in SAFE_ACTION_TYPES | ENTRY_ACTION_TYPES
+        ):
             continue
         count = item.get("count")
         suffix = (
@@ -547,6 +557,17 @@ def format_pull_report(report: dict[str, Any]) -> str:
         f"Scriptorium pull {report['generated_by']['version']}",
         f"Mode: {report['mode']}",
         f"Status: {str(report['status']).upper()}",
+    ]
+    lines.extend(
+        format_path_selection(
+            report,
+            conflict_guidance=(
+                "pull --run is blocked until explicit CLI roots are used."
+            ),
+        )
+    )
+    lines.extend(
+        [
         f"Codex scan: {'enabled' if report['entry']['scan_codex'] else 'disabled'}",
         "Stages: "
         + (
@@ -562,5 +583,6 @@ def format_pull_report(report: dict[str, Any]) -> str:
         "Errors: " + (", ".join(sorted(set(errors))) or "none"),
         f"Limitations: {len(report.get('limitations', []))}",
         "Raw component output: suppressed",
-    ]
+        ]
+    )
     return "\n".join(lines)

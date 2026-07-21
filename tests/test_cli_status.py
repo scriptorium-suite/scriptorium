@@ -72,6 +72,7 @@ class StatusCliTests(unittest.TestCase):
             mock.patch.dict(
                 os.environ,
                 {
+                    "SCRIPTORIUM_CONFIG_DIR": str(self.config_root),
                     "SCRIPTORIUM_WORKSPACE": str(environment_workspace),
                     "PROVENANCE_HOME": str(environment_home),
                 },
@@ -79,10 +80,14 @@ class StatusCliTests(unittest.TestCase):
             ),
             mock.patch("scriptorium.cli.run_status", return_value=status_report) as run,
         ):
-            self.invoke_json(["status", "--json"])
+            _exit_code, report, _stderr = self.invoke_json(["status", "--json"])
         self.assertEqual(run.call_args.kwargs["workspace"], environment_workspace)
         self.assertEqual(run.call_args.kwargs["provenance_home"], environment_home)
         self.assertIsNone(run.call_args.kwargs["project"])
+        self.assertEqual(
+            {warning["path"] for warning in report["warnings"]},
+            {"workspace", "data_root"},
+        )
 
         with (
             mock.patch.dict(

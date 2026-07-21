@@ -20,6 +20,13 @@ from .host import (
 )
 from .inventory import format_inventory_report, run_inventory
 from .init import InitError, format_init_report, run_init
+from .path_selection import (
+    attach_path_selection,
+    codex_home_selection,
+    root_selection,
+    select_configured_path,
+    selection_warnings,
+)
 from .pull import PullError, format_pull_report, run_pull
 from .status import StatusError, format_status_report, run_status
 
@@ -262,13 +269,8 @@ def _configured_path(
     environment_names: tuple[str, ...],
     configured: Path | None,
 ) -> Path | None:
-    if explicit is not None:
-        return explicit
-    for name in environment_names:
-        value = os.environ.get(name)
-        if value and value.strip():
-            return Path(value.strip())
-    return configured
+    selected, _ = select_configured_path(explicit, environment_names, configured)
+    return selected
 
 
 def _has_nonblank_environment(names: tuple[str, ...]) -> bool:
@@ -523,33 +525,45 @@ def main(argv: list[str] | None = None) -> int:
             print(format_init_report(init_report))
         return int(init_report["exit_code"])
     if args.command == "doctor":
+        selections = {
+            "spec_root": root_selection(args.spec_root, "SCRIPTORIUM_SPEC_ROOT"),
+            "steward_root": root_selection(
+                args.steward_root, "SCRIPTORIUM_STEWARD_ROOT"
+            ),
+            "provenance_root": root_selection(
+                args.provenance_root, "SCRIPTORIUM_PROVENANCE_ROOT"
+            ),
+            "lectern_root": root_selection(
+                args.lectern_root, "SCRIPTORIUM_LECTERN_ROOT"
+            ),
+            "codex_home": codex_home_selection(),
+        }
+        warnings: list[dict[str, object]] = []
         try:
             needs_config = (
                 args.config_dir is not None
-                or (
-                    args.workspace is None
-                    and not _has_nonblank_environment(
-                        ("SCRIPTORIUM_WORKSPACE", "PROVENANCE_VAULT")
-                    )
-                )
-                or (
-                    args.provenance_home is None
-                    and not _has_nonblank_environment(("PROVENANCE_HOME",))
-                )
+                or args.workspace is None
+                or args.provenance_home is None
             )
             suite_config = _load_suite_config(
                 args.config_dir, needed=needs_config
             )
-            workspace = _configured_path(
+            workspace, workspace_selection = select_configured_path(
                 args.workspace,
                 ("SCRIPTORIUM_WORKSPACE", "PROVENANCE_VAULT"),
                 suite_config.workspace if suite_config else None,
             )
-            provenance_home = _configured_path(
+            provenance_home, data_root_selection = select_configured_path(
                 args.provenance_home,
                 ("PROVENANCE_HOME",),
                 suite_config.provenance_home if suite_config else None,
             )
+            selections = {
+                "workspace": workspace_selection,
+                "data_root": data_root_selection,
+                **selections,
+            }
+            warnings = selection_warnings(selections)
             doctor_report = run_doctor(
                 target=args.target,
                 spec_root=args.spec_root,
@@ -559,11 +573,14 @@ def main(argv: list[str] | None = None) -> int:
                 lectern_root=args.lectern_root,
                 workspace=workspace,
             )
+            attach_path_selection(doctor_report, selections, warnings)
         except (ConfigError, DoctorError) as exc:
             if args.json_output:
+                error_report = _doctor_error_report(target=args.target)
+                attach_path_selection(error_report, selections, warnings)
                 print(
                     json.dumps(
-                        _doctor_error_report(target=args.target),
+                        error_report,
                         ensure_ascii=False,
                         indent=2,
                     )
@@ -577,36 +594,46 @@ def main(argv: list[str] | None = None) -> int:
             print(format_doctor_report(doctor_report))
         return int(doctor_report["exit_code"])
     if args.command == "pull":
+        selections = {
+            "provenance_root": root_selection(
+                args.provenance_root, "SCRIPTORIUM_PROVENANCE_ROOT"
+            ),
+            "codex_home": codex_home_selection(),
+        }
+        warnings: list[dict[str, object]] = []
         try:
             needs_config = (
                 args.config_dir is not None
-                or (
-                    args.workspace is None
-                    and not _has_nonblank_environment(
-                        ("SCRIPTORIUM_WORKSPACE", "PROVENANCE_VAULT")
-                    )
-                )
-                or (
-                    args.provenance_home is None
-                    and not _has_nonblank_environment(("PROVENANCE_HOME",))
-                )
+                or args.workspace is None
+                or args.provenance_home is None
             )
             suite_config = _load_suite_config(
                 args.config_dir, needed=needs_config
             )
-            workspace = _configured_path(
+            workspace, workspace_selection = select_configured_path(
                 args.workspace,
                 ("SCRIPTORIUM_WORKSPACE", "PROVENANCE_VAULT"),
                 suite_config.workspace if suite_config else None,
             )
-            provenance_home = _configured_path(
+            provenance_home, data_root_selection = select_configured_path(
                 args.provenance_home,
                 ("PROVENANCE_HOME",),
                 suite_config.provenance_home if suite_config else None,
             )
+            selections = {
+                "workspace": workspace_selection,
+                "data_root": data_root_selection,
+                **selections,
+            }
+            warnings = selection_warnings(selections)
             if workspace is None or provenance_home is None:
                 raise PullError(
                     "workspace and Provenance home are required via flags, environment, or suite config"
+                )
+            if args.run and warnings:
+                raise PullError(
+                    "environment path selection conflicts with suite config; "
+                    "pass explicit --workspace and --provenance-home paths before --run"
                 )
             pull_report = run_pull(
                 workspace=workspace,
@@ -619,11 +646,14 @@ def main(argv: list[str] | None = None) -> int:
                 ),
                 run=args.run,
             )
+            attach_path_selection(pull_report, selections, warnings)
         except (ConfigError, PullError) as exc:
             if args.json_output:
+                error_report = _pull_error_report(run=args.run)
+                attach_path_selection(error_report, selections, warnings)
                 print(
                     json.dumps(
-                        _pull_error_report(run=args.run),
+                        error_report,
                         ensure_ascii=False,
                         indent=2,
                     )
@@ -637,33 +667,45 @@ def main(argv: list[str] | None = None) -> int:
             print(format_pull_report(pull_report))
         return int(pull_report["exit_code"])
     if args.command == "status":
+        selections = {
+            "spec_root": root_selection(args.spec_root, "SCRIPTORIUM_SPEC_ROOT"),
+            "steward_root": root_selection(
+                args.steward_root, "SCRIPTORIUM_STEWARD_ROOT"
+            ),
+            "provenance_root": root_selection(
+                args.provenance_root, "SCRIPTORIUM_PROVENANCE_ROOT"
+            ),
+            "lectern_root": root_selection(
+                args.lectern_root, "SCRIPTORIUM_LECTERN_ROOT"
+            ),
+            "codex_home": codex_home_selection(),
+        }
+        warnings: list[dict[str, object]] = []
         try:
             needs_config = (
                 args.config_dir is not None
-                or (
-                    args.workspace is None
-                    and not _has_nonblank_environment(
-                        ("SCRIPTORIUM_WORKSPACE", "PROVENANCE_VAULT")
-                    )
-                )
-                or (
-                    args.provenance_home is None
-                    and not _has_nonblank_environment(("PROVENANCE_HOME",))
-                )
+                or args.workspace is None
+                or args.provenance_home is None
             )
             suite_config = _load_suite_config(
                 args.config_dir, needed=needs_config
             )
-            workspace = _configured_path(
+            workspace, workspace_selection = select_configured_path(
                 args.workspace,
                 ("SCRIPTORIUM_WORKSPACE", "PROVENANCE_VAULT"),
                 suite_config.workspace if suite_config else None,
             )
-            provenance_home = _configured_path(
+            provenance_home, data_root_selection = select_configured_path(
                 args.provenance_home,
                 ("PROVENANCE_HOME",),
                 suite_config.provenance_home if suite_config else None,
             )
+            selections = {
+                "workspace": workspace_selection,
+                "data_root": data_root_selection,
+                **selections,
+            }
+            warnings = selection_warnings(selections)
             if workspace is None or provenance_home is None:
                 raise StatusError(
                     "workspace and Provenance home are required via flags, environment, or suite config"
@@ -681,12 +723,15 @@ def main(argv: list[str] | None = None) -> int:
                 provenance_root=args.provenance_root,
                 lectern_root=args.lectern_root,
             )
+            attach_path_selection(status_report, selections, warnings)
         # Status is a content-free boundary; unexpected probe failures must not escape.
         except Exception:
             if args.json_output:
+                error_report = _status_error_report()
+                attach_path_selection(error_report, selections, warnings)
                 print(
                     json.dumps(
-                        _status_error_report(),
+                        error_report,
                         ensure_ascii=False,
                         indent=2,
                     )
