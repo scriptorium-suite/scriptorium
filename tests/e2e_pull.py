@@ -32,6 +32,7 @@ END_MARKER = "<!-- scriptorium:progress-log:end -->"
 HUMAN_TEXT = "Human-owned research rationale must remain byte-identical."
 TRAILING_HUMAN_TEXT = "Human-owned trailing notes must also remain untouched."
 TIMELINE_FACT = "Captured the synthetic Codex research session through the public pull entry."
+SECOND_TIMELINE_FACT = "Continued the synthetic project from the approved context capsule."
 CONCLUSION = "The synthetic research loop is ready for product-level validation."
 SYSTEM_ENV_NAMES = {
     "COMSPEC",
@@ -388,6 +389,15 @@ def status_arguments(*, provenance_root: Path) -> list[str]:
     ]
 
 
+def resume_arguments(*, provenance_root: Path) -> list[str]:
+    return [
+        "resume",
+        "--provenance-root",
+        str(provenance_root),
+        "--json",
+    ]
+
+
 def init_arguments(
     *,
     workspace: Path,
@@ -422,7 +432,13 @@ def init_arguments(
     return arguments
 
 
-def write_rollout(profile: Path, linked_repo: Path) -> Path:
+def write_rollout(
+    profile: Path,
+    linked_repo: Path,
+    *,
+    session_id: str = "e2e-codex-session",
+    filename: str = "rollout-e2e-pull.jsonl",
+) -> Path:
     rollout = (
         profile
         / ".codex"
@@ -430,7 +446,7 @@ def write_rollout(profile: Path, linked_repo: Path) -> Path:
         / "2026"
         / "07"
         / "16"
-        / "rollout-e2e-pull.jsonl"
+        / filename
     )
     rollout.parent.mkdir(parents=True, exist_ok=True)
     now = datetime.now(timezone.utc)
@@ -439,7 +455,7 @@ def write_rollout(profile: Path, linked_repo: Path) -> Path:
             "type": "session_meta",
             "timestamp": now.isoformat(),
             "payload": {
-                "session_id": "e2e-codex-session",
+                "session_id": session_id,
                 "cwd": linked_repo.as_posix(),
             },
         },
@@ -470,21 +486,31 @@ def write_rollout(profile: Path, linked_repo: Path) -> Path:
 
 
 def submit_fill(
-    summary_id: str, *, env: dict[str, str], provenance_home: Path
+    summary_id: str,
+    *,
+    env: dict[str, str],
+    provenance_home: Path,
+    timeline: list[str] | None = None,
+    include_high_value_claims: bool = True,
 ) -> None:
     fixture = {
         "schema_version": "summary-fill/1.0",
-        "timeline": [
+        "timeline": timeline or [
             TIMELINE_FACT,
             "Confirmed that preview, execution, and approval remain separate actions.",
         ],
-        "status": "active",
-        "stage": "product validation",
-        "next_actions": ["Review the isolated E2E evidence before release."],
-        "conclusion": CONCLUSION,
-        "blocked_by": "",
-        "confidence": "high",
     }
+    if include_high_value_claims:
+        fixture.update(
+            {
+                "status": "active",
+                "stage": "product validation",
+                "next_actions": ["Review the isolated E2E evidence before release."],
+                "conclusion": CONCLUSION,
+                "blocked_by": "",
+                "confidence": "high",
+            }
+        )
     report = invoke_provenance_json(
         "provenance.synclayer.pending_fill",
         [summary_id, "--provenance-home", str(provenance_home), "--json"],
@@ -1004,6 +1030,42 @@ def run_e2e(provenance_root: Path) -> None:
         require(CONCLUSION in approved_text, "Approved conclusion did not reach the progress log")
         require(human_regions(note_after_approval) == baseline_human, "Approval changed human-owned prose")
 
+        before_first_resume = snapshot_tree(base)
+        first_resume = invoke_json(
+            resume_arguments(provenance_root=provenance_root),
+            env=env,
+        )
+        require(
+            snapshot_tree(base) == before_first_resume,
+            "Context resume changed the isolated filesystem",
+        )
+        first_capsule = first_resume.get("capsule", {})
+        first_project = first_capsule.get("project", {})
+        first_progress = [
+            item
+            for block in first_capsule.get("recent_progress", [])
+            if isinstance(block, dict)
+            for item in block.get("items", [])
+        ]
+        require(
+            first_project.get("status") == "active"
+            and first_project.get("stage") == "product validation",
+            "First resumed session did not receive approved project state",
+        )
+        require(
+            first_project.get("conclusion") == CONCLUSION,
+            "First resumed session did not receive the approved conclusion",
+        )
+        require(
+            TIMELINE_FACT in first_progress,
+            "First resumed session did not receive prior low-risk progress",
+        )
+        require_private_values_absent(
+            first_resume,
+            label="First resume capsule",
+            forbidden=report_private_values,
+        )
+
         approvals_after_approval = approvals_path.read_bytes()
         final = invoke_json(
             configured_pull(run=True),
@@ -1017,6 +1079,120 @@ def run_e2e(provenance_root: Path) -> None:
         require(project_note.read_bytes() == note_after_approval, "Final rerun changed the project note")
         require(approvals_path.read_bytes() == approvals_after_approval, "Final rerun changed Approvals.md")
         require(human_regions(project_note.read_bytes()) == baseline_human, "Final rerun changed human-owned prose")
+
+        second_session_id = "e2e-codex-session-two"
+        second_rollout = write_rollout(
+            profile,
+            agent_cwd,
+            session_id=second_session_id,
+            filename="rollout-e2e-pull-two.jsonl",
+        )
+        second_private_values = [
+            *report_private_values,
+            second_session_id,
+            second_rollout,
+        ]
+        second_run = invoke_json(
+            configured_pull(run=True),
+            env=env,
+        )
+        require(
+            second_run.get("summary", {}).get("codex_enqueued") == 1,
+            "Second session was not enqueued exactly once",
+        )
+        require(
+            second_run.get("summary", {}).get("scaffolded") == 1,
+            "Second session did not create one pending scaffold",
+        )
+        require_private_values_absent(
+            second_run,
+            label="Second-session report",
+            forbidden=second_private_values,
+        )
+
+        second_scaffolds = read_pending_scaffolds(
+            env=env, provenance_home=provenance_home
+        )
+        require(
+            len(second_scaffolds) == 1,
+            "Second session did not expose exactly one pending scaffold",
+        )
+        second_summary_id = second_scaffolds[0].get("summary_id")
+        require(
+            isinstance(second_summary_id, str) and second_summary_id != summary_id,
+            "Second session did not receive a distinct stable summary id",
+        )
+        submit_fill(
+            second_summary_id,
+            env=env,
+            provenance_home=provenance_home,
+            timeline=[SECOND_TIMELINE_FACT],
+            include_high_value_claims=False,
+        )
+        second_applied = invoke_json(
+            configured_pull(run=True),
+            env=env,
+        )
+        require(
+            second_applied.get("summary", {}).get("applied") == 1,
+            "Second session timeline was not applied",
+        )
+        require(
+            second_applied.get("summary", {}).get("pending_approval") == 0,
+            "Timeline-only second session created a high-value approval",
+        )
+        require_private_values_absent(
+            second_applied,
+            label="Second-session apply report",
+            forbidden=second_private_values,
+        )
+        note_after_second = project_note.read_bytes()
+        require(
+            note_after_second.decode("utf-8").count(SECOND_TIMELINE_FACT) == 1,
+            "Second session timeline was not appended exactly once",
+        )
+        require(
+            human_regions(note_after_second) == baseline_human,
+            "Second session changed human-owned prose",
+        )
+
+        before_second_resume = snapshot_tree(base)
+        second_resume = invoke_json(
+            resume_arguments(provenance_root=provenance_root),
+            env=env,
+        )
+        require(
+            snapshot_tree(base) == before_second_resume,
+            "Second context resume changed the isolated filesystem",
+        )
+        second_progress = [
+            item
+            for block in second_resume.get("capsule", {}).get("recent_progress", [])
+            if isinstance(block, dict)
+            for item in block.get("items", [])
+        ]
+        require(
+            TIMELINE_FACT in second_progress and SECOND_TIMELINE_FACT in second_progress,
+            "Second resumed session could not recover both prior session increments",
+        )
+        require_private_values_absent(
+            second_resume,
+            label="Second resume capsule",
+            forbidden=second_private_values,
+        )
+
+        second_idempotent = invoke_json(
+            configured_pull(run=True),
+            env=env,
+        )
+        require(
+            second_idempotent.get("summary", {}).get("applied") == 0,
+            "Second-session idempotency rerun re-applied a summary",
+        )
+        require(
+            project_note.read_bytes() == note_after_second,
+            "Second-session idempotency rerun changed the project note",
+        )
 
         before_final_status = snapshot_tree(base)
         final_status = invoke_json(

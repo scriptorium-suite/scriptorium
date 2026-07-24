@@ -1,0 +1,30 @@
+{
+  "schema_version": "reading-note/1.0",
+  "id": "liu2024ActiveLearning",
+  "zotero_key": "DEMO0002",
+  "doi": "10.5555/demo.0002",
+  "read_status": "In Progress",
+  "created": "2026-07-15T09:30:00Z",
+  "generated_by": "scriptorium synthetic fixture",
+  "stages": {
+    "glance": {
+      "tldr": "[SYNTHETIC] Generated note about combining calibrated active learning with physics-informed priors.",
+      "tags": ["synthetic", "active-learning", "calibration"],
+      "key_findings": [
+        "[SYNTHETIC] The fixture records uncertainty calibration as a candidate design concern."
+      ]
+    },
+    "close_read": {
+      "question": "[SYNTHETIC] Can a closed loop prioritize informative fictional catalyst experiments?",
+      "method": "[SYNTHETIC] Deterministic ranking over generated candidate rows.",
+      "data": "[SYNTHETIC] Twelve generated catalyst candidates with no real-world meaning.",
+      "results": "[SYNTHETIC] The workflow records a reviewable result; it does not establish scientific validity.",
+      "figures": ["fig-synthetic-loop"]
+    }
+  },
+  "sources": {
+    "annotations": ["synthetic-note#calibration"],
+    "parsed_file": "fixtures/parsed-paper.v1.json",
+    "zotero_uri": "zotero://select/library/items/DEMO0002"
+  }
+}

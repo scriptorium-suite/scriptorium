@@ -39,9 +39,9 @@ class DemoUnitTests(unittest.TestCase):
         self.assertEqual(
             load_compatibility(),
             {
-                "scriptorium-spec": "2.2.0",
+                "scriptorium-spec": "2.3.0",
                 "steward": "0.2.0",
-                "provenance": "0.17.0",
+                "provenance": "0.18.0",
             },
         )
 
@@ -53,6 +53,31 @@ class DemoUnitTests(unittest.TestCase):
         self.assertEqual(data["schema_version"], "library-kb/1.1")
         self.assertEqual(data["generated_by"], "scriptorium demo fixture")
         self.assertEqual([item["key"] for item in data["items"]], ["DEMO0001", "DEMO0002", "DEMO0003"])
+
+    def test_demo_research_fixtures_are_synthetic_and_share_stable_citekeys(self):
+        expected = {
+            "parsed-paper.v1.json": "parsed-paper/1.0",
+            "reading-note.v1.json": "reading-note/1.0",
+            "review.v1.json": "review/1.0",
+            "lineage-graph.v1.json": "lineage-graph/1.0",
+        }
+        fixtures = {}
+        for name, schema_version in expected.items():
+            payload = resources.files("scriptorium.assets").joinpath(name).read_text(
+                encoding="utf-8"
+            )
+            self.assertIn("[SYNTHETIC]", payload)
+            self.assertNotRegex(payload, r"(?i)(?<![A-Z0-9])[A-Z]:[\\/]")
+            fixtures[name] = json.loads(payload)
+            self.assertEqual(fixtures[name]["schema_version"], schema_version)
+
+        self.assertEqual(fixtures["parsed-paper.v1.json"]["id"], "liu2024ActiveLearning")
+        self.assertEqual(fixtures["reading-note.v1.json"]["id"], "liu2024ActiveLearning")
+        review_rows = fixtures["review.v1.json"]["comparison_table"]["rows"]
+        lineage_nodes = fixtures["lineage-graph.v1.json"]["nodes"]
+        expected_citekeys = {"chen2022PhysicsInformed", "liu2024ActiveLearning"}
+        self.assertEqual({row["citekey"] for row in review_rows}, expected_citekeys)
+        self.assertEqual({node["citekey"] for node in lineage_nodes}, expected_citekeys)
 
     def test_prepare_output_reuses_only_owned_directory(self):
         with tempfile.TemporaryDirectory() as temporary:

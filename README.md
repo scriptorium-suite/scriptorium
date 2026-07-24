@@ -1,22 +1,26 @@
 # Scriptorium
 
-> **Public Alpha v0.1.0:** the umbrella repository ships safe initialization for
+> **Public Alpha v0.2.0 candidate:** the umbrella repository ships safe initialization for
 > a real project, one synthetic vertical slice through `scriptorium demo`, the
 > read-only `scriptorium doctor`, a content-free `scriptorium status` control-plane
 > summary, a zero-write `scriptorium inventory` preview for explicitly selected
 > local sources,
 > and explicit project-scoped Codex and Claude Code skill installers. It also ships
-> the accepted on-demand `scriptorium pull` entry through Provenance's
-> machine-readable public command. GitHub-hosted clean Windows CI and an isolated
-> Windows source-install acceptance run pass; live Agent-host parity and Lectern
-> remain outside the credential-free golden path.
+> the accepted on-demand `scriptorium pull` entry and bounded, read-only
+> `scriptorium resume` Context Capsule through Provenance's machine-readable
+> public commands. A safety-reviewed `scriptorium migrate` CLI is included as a
+> V0.3 candidate, not as a completed V0.3 release. The previously published baseline
+> has GitHub-hosted Windows evidence; this worktree also has local synthetic migration,
+> install/uninstall/reinstall, v0.1.0-to-current version-transition, and
+> Steward-to-Lectern checks, but still needs fresh remote CI.
+> Live Agent-host parity and real-provider slide generation remain manual Alpha gates.
 
 Scriptorium is a local-first, agent-native research workflow suite. This repository
 is its thin control plane: it coordinates independently useful components through
 public commands and versioned files without importing their internals or owning
 their research data.
 
-[中文说明](README.zh.md) · [中文产品案例](docs/case-study.zh-CN.md) · [Showcase evidence](docs/showcase/README.zh-CN.md) · [Contract source of truth](https://github.com/scriptorium-suite/scriptorium-spec) · [Design inspirations](ACKNOWLEDGEMENTS.md)
+[中文说明](README.zh.md) · [架构、使用与分层验收](docs/architecture-and-acceptance.zh-CN.md) · [中文产品案例](docs/case-study.zh-CN.md) · [Showcase evidence](docs/showcase/README.zh-CN.md) · [Contract source of truth](https://github.com/scriptorium-suite/scriptorium-spec) · [Design inspirations](ACKNOWLEDGEMENTS.md)
 
 ![Scriptorium Public Alpha synthetic golden-path evidence](docs/showcase/demo-poster.svg)
 
@@ -47,9 +51,11 @@ AI4Science literature workflow through the real public interfaces:
 1. validate a synthetic `library-kb/1.1` with `scriptorium-spec`;
 2. call Steward to scope two papers and assemble a review from a recorded agent draft;
 3. call Provenance to ingest the library and Markdown project;
-4. build and query the local search index;
-5. verify portfolio, project context, and literature search through Provenance MCP;
-6. write the human-readable artifacts and `demo-report.json`.
+4. validate and atomically ingest four synthetic literature-reading artifacts;
+5. build and query the local search index;
+6. verify portfolio, bounded Context Capsule, reference-only literature hints,
+   and literature search through Provenance MCP;
+7. write the human-readable artifacts and `demo-report.json`.
 
 The run needs no API key, Zotero, Obsidian, browser extension, or agent login.
 Once the source checkouts are installed, this demo path is designed to operate
@@ -77,6 +83,14 @@ its fill in-session, then another pull applies the low-risk timeline and stages
 high-value claims in `Approvals.md`. A user tick is still required before a later pull
 commits those claims.
 
+`scriptorium resume` is the bounded session-start view. It asks the compatible
+`prov-context` runtime for one registered project and accepts only an allowlisted
+capsule shape. Approved project fields are separated from auto-applied low-risk
+progress; literature and reading artifacts are explicitly reference-only. Raw
+conversations, drafts, rejected claims, component stderr, and local paths are not
+forwarded. The V0.2 end-to-end fixture runs two consecutive synthetic sessions and
+checks that the second session can recover the first session's reviewed state.
+
 `scriptorium status` is the daily content-free control-plane summary. It first rebuilds
 the Public Alpha readiness result from `doctor`; only when that boundary is ready
 does it run a `pull` preview. The result contains allowlisted capability states,
@@ -100,6 +114,34 @@ does not validate file contents, deduplicate files, copy data, or claim that a
 migration occurred. On Windows, selected objects are held through metadata-only
 bindings for the duration of the preview, so another process cannot rename, delete,
 or open them for data write until the command finishes.
+
+`scriptorium migrate` is the V0.3 candidate copy boundary for explicitly selected
+Markdown/PDF files. `plan` is write-free; first `apply` requires the selected
+sources; later `apply`, `verify`, and `rollback` recover the batch from only its
+workspace and batch identifier. The preview is advisory rather than a persisted
+execution snapshot: first `apply` rescans and re-hashes the explicit sources.
+Targets are created without overwrite through a
+same-directory hard-link publication step. Apply uses a random, exclusively
+created `.scriptorium-*.stage` file; only after one file descriptor has completed
+copy, hash, flush, and identity checks is that stage sealed into the private
+manifest and published as the target's same-file ownership anchor. A crash before
+that seal may leave an unclaimed random stage. It is never adopted or deleted
+automatically.
+
+Rollback records a random same-directory quarantine name before each target and
+anchor transition, atomically moves without replacement, then re-verifies content
+and recorded file identity before deletion. A replacement detectable through
+those recorded properties is restored to its original path when possible,
+otherwise preserved in quarantine while rollback fails closed. This coordinates
+cooperative local processes; it does not claim protection against a malicious
+replacement after every link to a file identity has disappeared, because a
+filesystem may reuse that identity. Automatic rollback requires Windows no-replace
+rename or Linux `renameat2(RENAME_NOREPLACE)`; other platforms fail closed. Private
+path manifests use the canonical per-user local state root outside the workspace;
+sources may not overlap that private state root, and no arbitrary state-root flag
+is exposed. Terminal
+and JSON reports contain aggregate counts and states only. This command copies
+files—it does not parse, index, approve, or ingest them into Provenance.
 
 ## Source quickstart on Windows
 
@@ -146,6 +188,53 @@ terminal and `--json` outputs contain counts and fixed route labels, not local p
 filenames, research text, hashes, sizes, or timestamps. An incomplete or unsafe scan
 fails closed with exit code `1`; malformed invocation or an internal boundary failure
 returns `2` without echoing the sensitive input.
+
+### V0.3 candidate: copy selected Markdown/PDF files safely
+
+Use a stable batch identifier. Review the aggregate plan first, then repeat the
+same explicit sources for the first apply:
+
+```powershell
+$Legacy = 'D:\Research\Legacy Notes'
+$MigrationWorkspace = 'D:\Research\Scriptorium Workspace'
+$Batch = 'legacy-notes-001'
+
+.\.venv\Scripts\scriptorium.exe migrate plan `
+  --source $Legacy `
+  --workspace $MigrationWorkspace `
+  --batch-id $Batch `
+  --json
+
+.\.venv\Scripts\scriptorium.exe migrate apply `
+  --source $Legacy `
+  --workspace $MigrationWorkspace `
+  --batch-id $Batch `
+  --json
+
+# Recovery operations need no source path or saved plan.
+.\.venv\Scripts\scriptorium.exe migrate verify `
+  --workspace $MigrationWorkspace `
+  --batch-id $Batch `
+  --json
+.\.venv\Scripts\scriptorium.exe migrate apply `
+  --workspace $MigrationWorkspace `
+  --batch-id $Batch `
+  --json
+.\.venv\Scripts\scriptorium.exe migrate rollback `
+  --workspace $MigrationWorkspace `
+  --batch-id $Batch `
+  --json
+```
+
+The second `apply` is an idempotency/recovery check and should report
+`unchanged`. The destination filesystem must support hard links; the command
+fails closed instead of using an overwrite-capable fallback. Do not remove the
+internal `.scriptorium-*.stage` ownership anchors or `.scriptorium-*.rollback`
+quarantine entries while a batch is active; a successful rollback removes its
+recorded entries. A process crash before a random stage is recorded can leave an
+unclaimed stage for manual inspection; Scriptorium will not guess that it owns or
+delete that path. Keep this candidate on synthetic or isolated copies until its
+full V0.3 acceptance gate is complete.
 
 ### Ten-minute path for a real project
 
@@ -298,6 +387,7 @@ Both paths are explicit and local; use `--json` for the stable machine report:
 ```powershell
 scriptorium pull --workspace D:\Research\Workspace --provenance-home D:\Research\ProvenanceData
 scriptorium pull --workspace D:\Research\Workspace --provenance-home D:\Research\ProvenanceData --run
+scriptorium resume --provenance-home D:\Research\ProvenanceData --project my-project
 ```
 
 The paths must already exist. Scriptorium never falls back to the current directory
@@ -345,6 +435,8 @@ reported as a successful live integration or provider check. Public Alpha worksp
 evidence requires at least one `Projects/*.md` note with complete `project/1.x`
 frontmatter; an arbitrary repository README is not treated as a research workspace.
 `entry.pull` passes only when the compatible machine-readable capability probe succeeds.
+Public Alpha also requires compatible `prov-ingest-research` and `prov-context`
+commands, and probes the actual Context Capsule runtime version.
 Codex provides the first executable session-capture path; a Claude-only installation
 remains a manual readiness item until its opt-in `SessionEnd` hook is live-verified.
 
@@ -397,12 +489,12 @@ the current report.
 
 ## Compatibility baseline
 
-The first golden path intentionally locks exact source versions as its coordinated
-Public Alpha release targets:
+The current V0.2 candidate intentionally locks exact source versions as its
+coordinated compatibility baseline:
 
-- `scriptorium-spec` 2.2.0
+- `scriptorium-spec` 2.3.0
 - Steward 0.2.0
-- Provenance 0.17.0
+- Provenance 0.18.0
 
 The demo and CI workflows continue to pin exact component commits. A range-based
 compatibility policy is intentionally deferred until external Alpha usage provides
@@ -410,11 +502,13 @@ evidence for safe ranges.
 
 ## Next product increments
 
-1. add a compact project context-capsule/resume entry over Provenance MCP, distinct
-   from the content-free control-plane `status`;
-2. add an explicitly reviewed, adapter-specific migration manifest and apply path;
-3. add schema-driven cross-repository E2E for Lectern handoff;
-4. verify live Claude Code `SessionEnd` parity with the Codex capture path;
+1. run the current migration, install lifecycle, and slide handoff gates on fresh
+   remote Windows CI and in an isolated user environment before promotion;
+2. wire the approved `experiment-run/1.0` contract into local run registration,
+   persistence, and query, including failed runs, without embedding a compute engine;
+3. wire `claim-evidence/1.0` into validation, human review, and explicit links
+   between run evidence and candidate claims;
+4. verify real-provider Lectern output and live Claude Code `SessionEnd` parity;
 5. run an external-user Alpha and use the evidence to shape packaging and
    compatibility ranges.
 

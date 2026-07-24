@@ -1,0 +1,31 @@
+{
+  "schema_version": "review/1.0",
+  "direction": {
+    "query": "[SYNTHETIC] Physics-informed active learning for catalyst discovery",
+    "created": "2026-07-15T10:00:00Z"
+  },
+  "sections": [
+    {
+      "heading": "[SYNTHETIC] Candidate direction",
+      "prose": "[SYNTHETIC] The generated comparison suggests testing whether physics-informed priors and calibrated acquisition can be evaluated together. This is a workflow fixture, not a scientific conclusion."
+    }
+  ],
+  "comparison_table": {
+    "columns": ["Synthetic role", "Review state"],
+    "rows": [
+      {
+        "citekey": "chen2022PhysicsInformed",
+        "cells": ["Generated prior", "Read"]
+      },
+      {
+        "citekey": "liu2024ActiveLearning",
+        "cells": ["Generated acquisition loop", "In Progress"]
+      }
+    ]
+  },
+  "gaps": [
+    "[SYNTHETIC] No deterministic experiment yet links calibration quality to candidate-selection efficiency."
+  ],
+  "priority_reads": ["liu2024ActiveLearning"],
+  "lineage_ref": "fixtures/lineage-graph.v1.json"
+}

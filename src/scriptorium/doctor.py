@@ -30,6 +30,7 @@ TARGETS = ("demo", "public-alpha")
 PROBE_TIMEOUT_SECONDS = 5
 PROVENANCE_BASE_COMMANDS = (
     "prov-ingest-library",
+    "prov-ingest-research",
     "prov-ingest-vault",
     "prov-search",
     "prov-mcp",
@@ -421,7 +422,7 @@ def _provenance_check(
             required_for=TARGETS,
             passed=passed,
             summary=(
-                f"Provenance source/runtime {expected_version} and four public commands matched"
+                f"Provenance source/runtime {expected_version} and five public commands matched"
                 if passed
                 else "; ".join(errors)
             ),
@@ -434,7 +435,7 @@ def _provenance_check(
             },
             remediation=(
                 "Install the compatible Provenance checkout in one environment "
-                "and expose all four public commands."
+                "and expose all five public commands."
             ),
         ),
         root,
@@ -876,6 +877,77 @@ def _entry_pull_check(
     )
 
 
+def _entry_context_check(
+    target: str,
+    provenance_root: Path | None,
+    expected_version: str | None = None,
+) -> dict[str, Any]:
+    command = None
+    command_parent = None
+    baseline_commands: dict[str, Path] = {}
+    baseline_parent = None
+    runtime_version = None
+    error = None
+    try:
+        if provenance_root is None:
+            raise DoctorError("compatible Provenance source checkout is unavailable")
+        command = find_script(provenance_root, "prov-context")
+        baseline_commands = {
+            name: find_script(provenance_root, name)
+            for name in PROVENANCE_BASE_COMMANDS
+        }
+        baseline_parents = {path.parent.resolve() for path in baseline_commands.values()}
+        if len(baseline_parents) != 1:
+            raise DoctorError(
+                "baseline Provenance commands resolve from different environments"
+            )
+        baseline_parent = next(iter(baseline_parents))
+        command_parent = command.parent.resolve()
+        if command_parent != baseline_parent:
+            raise DoctorError(
+                "public context command resolves from a different Provenance environment"
+            )
+        runtime_version = _run_probe(
+            [str(command), "--version"],
+            cwd=provenance_root,
+            extra_env={"PROVENANCE_HOME": os.devnull},
+        ).strip()
+        if expected_version is not None and runtime_version != expected_version:
+            raise DoctorError(
+                f"context runtime version {runtime_version} != {expected_version}"
+            )
+    except (DemoError, DoctorError, OSError, RuntimeError) as exc:
+        error = str(exc)
+    passed = error is None
+    return _check(
+        "entry.resume",
+        target=target,
+        required_for=("public-alpha",),
+        passed=passed,
+        summary=(
+            "Read-only bounded context-capsule entry is available"
+            if passed
+            else "The context-capsule resume entry is unavailable or incompatible"
+        ),
+        details={
+            "command": str(command) if command else None,
+            "command_parent": str(command_parent) if command_parent else None,
+            "baseline_commands": {
+                name: str(path) for name, path in baseline_commands.items()
+            },
+            "baseline_command_parent": str(baseline_parent) if baseline_parent else None,
+            "implemented": passed,
+            "expected_version": expected_version,
+            "runtime_version": runtime_version,
+            "error": error,
+        },
+        remediation=(
+            "Install the compatible Provenance build exposing `prov-context`, then "
+            "reinstall the Scriptorium suite entry in the same environment."
+        ),
+    )
+
+
 def _registry_application(executable: str) -> Path | None:
     if os.name != "nt":
         return None
@@ -1295,6 +1367,9 @@ def run_doctor(
             host_adapter,
             _agent_capture_check(target, host_adapter),
             _entry_pull_check(target, resolved_provenance, expected["provenance"]),
+            _entry_context_check(
+                target, resolved_provenance, expected["provenance"]
+            ),
         ]
     )
     lectern, _ = _lectern_check(target, lectern_root)

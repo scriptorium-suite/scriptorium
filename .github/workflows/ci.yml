@@ -27,6 +27,8 @@ jobs:
       - run: scriptorium --version
       - run: scriptorium init --help
       - run: scriptorium inventory --help
+      - run: scriptorium migrate --help
+      - run: scriptorium resume --help
       - run: scriptorium status --help
       - run: scriptorium doctor --help
       - run: scriptorium host install --help
@@ -41,8 +43,13 @@ jobs:
           persist-credentials: false
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
+          ref: v0.1.0
+          path: scriptorium-v0.1.0
+          persist-credentials: false
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
           repository: scriptorium-suite/scriptorium-spec
-          ref: 66bfefea93758231491fadc4694708d1b8107ea0
+          ref: 0439e7abe4dd307c8b97afa34f9fc3b45605d3b4
           path: scriptorium-spec
           persist-credentials: false
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -54,12 +61,55 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           repository: foxsplendid/Provenance
-          ref: 910efbc47e604c51314866174581cfdd7eac47b6
+          ref: 6380bb0a8bfe8129a9edb2f903856a33b59dbcbb
           path: Provenance
+          persist-credentials: false
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          repository: foxsplendid/Academic-Slides-Agent
+          ref: 6371f1e6eac41f505aed39e58dafb689317cab65
+          path: Academic-Slides-Agent
           persist-credentials: false
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
+      - name: Install pinned build backend
+        run: >-
+          python -m pip install
+          --disable-pip-version-check
+          --no-deps
+          --only-binary=:all:
+          "setuptools==83.0.0"
+      - name: Verify clean Windows install lifecycle
+        shell: pwsh
+        run: |
+          python .\scriptorium\tests\e2e_install_lifecycle.py `
+            --scriptorium-root .\scriptorium `
+            --spec-root .\scriptorium-spec `
+            --steward-root .\steward `
+            --provenance-root .\Provenance `
+            --previous-scriptorium-root .\scriptorium-v0.1.0 `
+            --require-windows `
+            --report .\install-lifecycle-report.json
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+          $report = Get-Content -LiteralPath .\install-lifecycle-report.json -Raw | ConvertFrom-Json
+          if (
+            $report.status -ne "passed" -or
+            $report.lifecycle.clean_install -ne "passed" -or
+            $report.lifecycle.uninstall -ne "passed" -or
+            $report.lifecycle.reinstall -ne "passed" -or
+            $report.lifecycle.doctor_and_demo -ne "passed" -or
+            $report.lifecycle.version_transition.status -ne "passed" -or
+            $report.lifecycle.version_transition.previous_version -ne "0.1.0"
+          ) {
+            throw "Clean Windows install lifecycle did not pass"
+          }
+      - name: Install uv for Lectern
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b # v8.1.0
+        with:
+          version: "0.11.16"
+          python-version: "3.12.3"
       - name: Install source checkouts
         shell: pwsh
         run: |
@@ -67,6 +117,8 @@ jobs:
           .\.demo-venv\Scripts\python.exe -m pip install --no-deps .\scriptorium
           .\.demo-venv\Scripts\python.exe -m pip install --no-deps .\steward
           .\.demo-venv\Scripts\python.exe -m pip install --no-deps .\Provenance
+      - name: Install Lectern workspace without provider extras
+        run: uv sync --project .\Academic-Slides-Agent --all-packages --locked --no-dev
       - name: Smoke installed public pull entries
         shell: pwsh
         run: |
@@ -78,6 +130,13 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           & .\.demo-venv\Scripts\prov-sync-unresolved.exe --help | Out-Null
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & .\.demo-venv\Scripts\prov-ingest-research.exe --help | Out-Null
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $contextVersion = & .\.demo-venv\Scripts\prov-context.exe --version
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (($contextVersion -join "`n").Trim() -ne '0.18.0') {
+            throw "Installed Provenance context runtime version mismatch"
+          }
 
           $raw = & .\.demo-venv\Scripts\prov-sync-pull.exe --capabilities --json
           $code = $LASTEXITCODE
@@ -98,7 +157,11 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           & .\.demo-venv\Scripts\scriptorium.exe inventory --help | Out-Null
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & .\.demo-venv\Scripts\scriptorium.exe migrate --help | Out-Null
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           & .\.demo-venv\Scripts\scriptorium.exe status --help | Out-Null
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & .\.demo-venv\Scripts\scriptorium.exe resume --help | Out-Null
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
           $errorRaw = & .\.demo-venv\Scripts\scriptorium.exe pull --json 2>$null
@@ -163,12 +226,147 @@ jobs:
           if ([IO.File]::ReadAllText((Join-Path $source 'private-note.md')) -ne 'PRIVATE_RESEARCH_SENTINEL') {
             throw "Inventory modified a source file"
           }
+      - name: Smoke installed synthetic migration lifecycle
+        shell: pwsh
+        run: |
+          $root = Join-Path $env:RUNNER_TEMP 'migration smoke'
+          $source = Join-Path $root 'selected source'
+          $workspace = Join-Path $root 'research workspace'
+          $env:LOCALAPPDATA = Join-Path $root 'canonical local state'
+          New-Item -ItemType Directory -Path $source, $workspace | Out-Null
+
+          [IO.File]::WriteAllText(
+            (Join-Path $source 'synthetic-note.md'),
+            '# SYNTHETIC_MIGRATION_SENTINEL'
+          )
+          [IO.File]::WriteAllText(
+            (Join-Path $source 'synthetic-paper.pdf'),
+            '%PDF-1.4 SYNTHETIC'
+          )
+
+          $planRaw = & .\.demo-venv\Scripts\scriptorium.exe migrate plan `
+            --source $source `
+            --workspace $workspace `
+            --batch-id synthetic-ci `
+            --json
+          if ($LASTEXITCODE -ne 0) { throw "Installed migration plan failed" }
+          $planSerialized = $planRaw -join "`n"
+          $plan = $planSerialized | ConvertFrom-Json
+          if (
+            $plan.operation -ne 'plan' -or
+            $plan.status -ne 'planned' -or
+            $plan.summary.files -ne 2
+          ) {
+            throw "Installed migration plan report changed"
+          }
+          if (Test-Path (Join-Path $workspace 'Sources')) {
+            throw "Migration plan wrote into the workspace"
+          }
+          if (Test-Path $env:LOCALAPPDATA) {
+            throw "Migration plan persisted private state"
+          }
+
+          $applyRaw = & .\.demo-venv\Scripts\scriptorium.exe migrate apply `
+            --source $source `
+            --workspace $workspace `
+            --batch-id synthetic-ci `
+            --json
+          if ($LASTEXITCODE -ne 0) { throw "Installed migration apply failed" }
+          $applySerialized = $applyRaw -join "`n"
+          $apply = $applySerialized | ConvertFrom-Json
+          if (
+            $apply.operation -ne 'apply' -or
+            $apply.status -ne 'applied' -or
+            $apply.summary.changed -ne 2
+          ) {
+            throw "Installed migration apply report changed"
+          }
+
+          $verifyRaw = & .\.demo-venv\Scripts\scriptorium.exe migrate verify `
+            --workspace $workspace `
+            --batch-id synthetic-ci `
+            --json
+          if ($LASTEXITCODE -ne 0) { throw "Installed migration verify failed" }
+          $verify = ($verifyRaw -join "`n") | ConvertFrom-Json
+          if ($verify.operation -ne 'verify' -or $verify.status -ne 'applied') {
+            throw "Installed migration verify report changed"
+          }
+
+          $repeatRaw = & .\.demo-venv\Scripts\scriptorium.exe migrate apply `
+            --workspace $workspace `
+            --batch-id synthetic-ci `
+            --json
+          if ($LASTEXITCODE -ne 0) { throw "Installed migration reapply failed" }
+          $repeat = ($repeatRaw -join "`n") | ConvertFrom-Json
+          if ($repeat.status -ne 'unchanged') {
+            throw "Installed migration reapply was not idempotent"
+          }
+
+          $rollbackRaw = & .\.demo-venv\Scripts\scriptorium.exe migrate rollback `
+            --workspace $workspace `
+            --batch-id synthetic-ci `
+            --json
+          if ($LASTEXITCODE -ne 0) { throw "Installed migration rollback failed" }
+          $rollbackSerialized = $rollbackRaw -join "`n"
+          $rollback = $rollbackSerialized | ConvertFrom-Json
+          if (
+            $rollback.operation -ne 'rollback' -or
+            $rollback.status -ne 'rolled-back' -or
+            $rollback.summary.changed -ne 2
+          ) {
+            throw "Installed migration rollback report changed"
+          }
+
+          $allReports = @(
+            $planSerialized,
+            $applySerialized,
+            ($verifyRaw -join "`n"),
+            ($repeatRaw -join "`n"),
+            $rollbackSerialized
+          ) -join "`n"
+          foreach ($privateValue in @(
+            $root,
+            $source,
+            $workspace,
+            'synthetic-note.md',
+            'synthetic-paper.pdf',
+            'SYNTHETIC_MIGRATION_SENTINEL'
+          )) {
+            if ($allReports.Contains($privateValue)) {
+              throw "Migration report exposed a private source value"
+            }
+          }
+          if (
+            [IO.File]::ReadAllText((Join-Path $source 'synthetic-note.md')) -ne
+            '# SYNTHETIC_MIGRATION_SENTINEL'
+          ) {
+            throw "Migration modified its source"
+          }
+          $remaining = @(
+            Get-ChildItem `
+              (Join-Path $workspace 'Sources\Imported\synthetic-ci') `
+              -File `
+              -Recurse `
+              -ErrorAction SilentlyContinue
+          )
+          if ($remaining.Count -ne 0) {
+            throw "Migration rollback left owned files"
+          }
       - name: Run isolated public pull E2E
         shell: pwsh
         run: |
           & .\.demo-venv\Scripts\python.exe `
             .\scriptorium\tests\e2e_pull.py `
             --provenance-root .\Provenance
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Run offline Steward to Lectern golden path
+        shell: pwsh
+        run: |
+          & .\.demo-venv\Scripts\python.exe `
+            .\scriptorium\tests\e2e_slides.py `
+            --steward-root .\steward `
+            --spec-root .\scriptorium-spec `
+            --lectern-root .\Academic-Slides-Agent
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Run credential-free golden path
         shell: pwsh
@@ -194,4 +392,5 @@ jobs:
           path: |
             demo 输出
             doctor-report.json
+            install-lifecycle-report.json
           retention-days: 14
