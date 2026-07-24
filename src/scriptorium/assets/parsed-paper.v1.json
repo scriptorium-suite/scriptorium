@@ -1,0 +1,43 @@
+{
+  "schema_version": "parsed-paper/1.0",
+  "id": "liu2024ActiveLearning",
+  "created": "2026-07-15T09:00:00Z",
+  "parser": "scriptorium synthetic fixture",
+  "source_pdf": "fixtures/synthetic-active-learning.pdf",
+  "metadata": {
+    "title": "[SYNTHETIC] Active learning for closed-loop materials experiments",
+    "authors": ["Synthetic Author"],
+    "year": "2024",
+    "doi": "10.5555/demo.0002",
+    "abstract": "[SYNTHETIC] This generated abstract exists only to test the Scriptorium workflow."
+  },
+  "sections": [
+    {
+      "heading": "Synthetic method",
+      "level": 1,
+      "text": "[SYNTHETIC] A deterministic fixture ranks fictional catalyst candidates by generated uncertainty values."
+    },
+    {
+      "heading": "Synthetic result",
+      "level": 1,
+      "text": "[SYNTHETIC] The fixture demonstrates traceable evidence flow and makes no scientific performance claim."
+    }
+  ],
+  "references": [
+    {
+      "raw": "Chen (2022). [SYNTHETIC] Physics-informed learning for materials discovery.",
+      "title": "[SYNTHETIC] Physics-informed learning for materials discovery",
+      "authors": ["Chen"],
+      "year": "2022",
+      "doi": "10.5555/demo.0001"
+    }
+  ],
+  "figures": [
+    {
+      "id": "fig-synthetic-loop",
+      "caption": "[SYNTHETIC] Generated closed-loop selection diagram.",
+      "page": 2
+    }
+  ],
+  "tables": []
+}

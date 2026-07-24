@@ -11,6 +11,7 @@ from unittest import mock
 from scriptorium import cli
 from scriptorium.doctor import (
     DoctorError,
+    PROVENANCE_BASE_COMMANDS,
     TARGETS,
     _agent_host_check,
     _browser_extension_check,
@@ -19,6 +20,7 @@ from scriptorium.doctor import (
     _find_application,
     _host_adapter_check,
     _agent_capture_check,
+    _entry_context_check,
     _entry_pull_check,
     _project_metadata,
     _provenance_home_check,
@@ -242,6 +244,9 @@ class DoctorReportTests(unittest.TestCase):
 
 
 class DoctorProbeTests(unittest.TestCase):
+    def test_public_alpha_baseline_requires_research_artifact_ingest(self):
+        self.assertIn("prov-ingest-research", PROVENANCE_BASE_COMMANDS)
+
     def test_invalid_lectern_environment_root_fails_closed(self):
         with tempfile.TemporaryDirectory() as temporary:
             missing = Path(temporary) / "missing-lectern"
@@ -698,6 +703,52 @@ class DoctorProbeTests(unittest.TestCase):
             "scriptorium.doctor._run_probe", return_value=json.dumps(payload)
         ) as probe:
             check = _entry_pull_check(
+                "public-alpha", Path("Provenance"), "0.17.0"
+            )
+
+        self.assertEqual(check["status"], "fail")
+        self.assertIn("different Provenance environment", check["details"]["error"])
+        probe.assert_not_called()
+
+    def test_context_entry_requires_matching_runtime_version(self):
+        with mock.patch(
+            "scriptorium.doctor.find_script",
+            side_effect=lambda _root, name: Path("shared-environment") / name,
+        ), mock.patch(
+            "scriptorium.doctor._run_probe", return_value="0.17.0\n"
+        ) as probe:
+            ready = _entry_context_check(
+                "public-alpha", Path("Provenance"), "0.17.0"
+            )
+            mismatch = _entry_context_check(
+                "public-alpha", Path("Provenance"), "0.18.0"
+            )
+
+        self.assertEqual(ready["status"], "pass")
+        self.assertEqual(ready["details"]["runtime_version"], "0.17.0")
+        self.assertEqual(mismatch["status"], "fail")
+        self.assertIn("runtime version", mismatch["details"]["error"])
+        self.assertEqual(probe.call_args.args[0][-1], "--version")
+
+    def test_context_entry_is_required_only_for_public_alpha(self):
+        public = _entry_context_check("public-alpha", None, "0.17.0")
+        demo = _entry_context_check("demo", None, "0.17.0")
+        self.assertEqual(public["status"], "fail")
+        self.assertEqual(demo["status"], "info")
+
+    def test_context_command_must_share_the_provenance_environment(self):
+        def locate(_root: Path, name: str) -> Path:
+            directory = (
+                "context-environment"
+                if name == "prov-context"
+                else "base-environment"
+            )
+            return Path(directory) / name
+
+        with mock.patch(
+            "scriptorium.doctor.find_script", side_effect=locate
+        ), mock.patch("scriptorium.doctor._run_probe") as probe:
+            check = _entry_context_check(
                 "public-alpha", Path("Provenance"), "0.17.0"
             )
 

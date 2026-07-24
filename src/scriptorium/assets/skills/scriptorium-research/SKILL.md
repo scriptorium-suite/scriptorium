@@ -14,11 +14,15 @@ CLI, read-only MCP tools, and owned files as its stable interface.
 1. Orient to the workspace.
    - Identify the workspace, project, research question, current stage, and requested
      deliverable. Run `scriptorium doctor --json --workspace <path>` when available.
+   - At the start of a continuing project, prefer
+     `scriptorium resume --project <project-id> --json` or Provenance MCP
+     `get_context_capsule`. Use the bounded capsule as navigation; retrieve older
+     sessions or source text only when the current task needs them.
    - Read the relevant `Projects/*.md` note and existing contract artifacts before
      proposing changes.
-   - Query Provenance through `get_current_context`, `get_portfolio`, or
-     `search_brain` when available. Treat memory as retrieval context, never as a
-     replacement for source files or primary evidence.
+   - Fall back to `get_current_context`, `get_portfolio`, or `search_brain` when the
+     capsule entry is unavailable. Treat memory and `reference_only` capsule items as
+     retrieval context, never as approved claims or replacements for primary evidence.
 2. Frame the next decision.
    - Restate the question, evidence already available, assumptions, constraints, and
      a concrete success check.

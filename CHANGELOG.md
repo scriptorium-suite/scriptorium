@@ -1,5 +1,33 @@
 # Changelog
 
+## 0.2.0 (candidate) — 2026-07-22
+
+- Add `scriptorium resume`, backed by Provenance's bounded, read-only Context
+  Capsule. It restores approved project state, explicitly labels auto-applied
+  low-risk progress, and keeps literature artifacts reference-only.
+- Extend the synthetic demo with all four literature-reading artifacts, atomic
+  idempotent ingestion, reference hints, and privacy assertions.
+- Exercise two consecutive synthetic Agent sessions so the second session proves
+  that it can resume the first session's reviewed project state.
+- Require compatible `prov-context` and `prov-ingest-research` commands in Public
+  Alpha diagnostics, including an actual runtime-version probe.
+- Move the candidate compatibility baseline to `scriptorium-spec` 2.3.0 for the
+  `experiment-run/1.0` and `claim-evidence/1.0` contracts. Runtime registration,
+  persistence, query, human review, and claim linkage remain V0.3 work.
+- Add the safety-reviewed `scriptorium migrate` CLI as a V0.3 candidate for
+  explicit Markdown/PDF copies: write-free plan, create-if-absent apply,
+  canonical private state, cross-process verify/reapply recovery, and rollback.
+  Reports and errors remain aggregate-only and path-free; this does not mark V0.3
+  complete.
+- Add an offline, synthetic Steward-to-Lectern acceptance path that validates a
+  two-paper handoff through Lectern's production graph, stops for outline approval
+  with no persistent pre-approval PPTX, compiles an editable deck, and
+  scans transferable artifacts for paths, email addresses, and credential shapes.
+- Add a temporary clean-environment lifecycle gate that builds local wheels with
+  package indexes disabled, verifies install/uninstall/reinstall and the synthetic
+  demo, and exercises the public v0.1.0-to-current version transition. Live Agent,
+  PowerPoint, external-user, and fresh remote-CI acceptance remain explicit gates.
+
 ## 0.1.0 — 2026-07-20
 
 - Add `scriptorium inventory`, a deterministic, zero-write preview for explicitly

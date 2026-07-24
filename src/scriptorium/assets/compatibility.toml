@@ -1,6 +1,6 @@
 manifest_version = 1
 
 [components]
-"scriptorium-spec" = "2.2.0"
+"scriptorium-spec" = "2.3.0"
 steward = "0.2.0"
-provenance = "0.17.0"
+provenance = "0.18.0"

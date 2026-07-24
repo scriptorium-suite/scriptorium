@@ -20,6 +20,18 @@ from .host import (
 )
 from .inventory import format_inventory_report, run_inventory
 from .init import InitError, format_init_report, run_init
+from .migration import (
+    MIGRATION_LIMITATIONS,
+    REPORT_VERSION as MIGRATION_REPORT_VERSION,
+    MigrationError,
+    apply_migration,
+    format_migration_report,
+    load_migration,
+    plan_migration,
+    reapply_migration,
+    rollback_migration,
+    verify_migration,
+)
 from .path_selection import (
     attach_path_selection,
     codex_home_selection,
@@ -28,6 +40,7 @@ from .path_selection import (
     selection_warnings,
 )
 from .pull import PullError, format_pull_report, run_pull
+from .resume import ResumeError, format_resume_report, run_resume
 from .status import StatusError, format_status_report, run_status
 
 
@@ -173,6 +186,29 @@ def build_parser(*, json_errors: bool = False) -> argparse.ArgumentParser:
         help="configuration family root used when workspace/data paths are omitted",
     )
 
+    resume = commands.add_parser(
+        "resume",
+        help="read a bounded, reviewable project context capsule",
+    )
+    resume.add_argument(
+        "--provenance-home",
+        type=Path,
+        help="existing Provenance data root (or use suite config)",
+    )
+    resume.add_argument("--provenance-root", type=Path, help="source checkout of Provenance")
+    resume.add_argument(
+        "--project",
+        help="registered project id (or use the suite default project)",
+    )
+    resume.add_argument(
+        "--json", action="store_true", dest="json_output", help="write JSON to stdout"
+    )
+    resume.add_argument(
+        "--config-dir",
+        type=Path,
+        help="configuration family root used when data root/project are omitted",
+    )
+
     status = commands.add_parser(
         "status",
         help="show content-free readiness and pending research workflow counts",
@@ -232,6 +268,71 @@ def build_parser(*, json_errors: bool = False) -> argparse.ArgumentParser:
     inventory.add_argument(
         "--json", action="store_true", dest="json_output", help="write JSON to stdout"
     )
+
+    migrate = commands.add_parser(
+        "migrate",
+        help="plan, apply, verify, or roll back an explicit Markdown/PDF migration",
+    )
+    migrate_commands = migrate.add_subparsers(
+        dest="migrate_command", required=True
+    )
+
+    def add_migration_identity(command: argparse.ArgumentParser) -> None:
+        command.add_argument(
+            "--workspace",
+            type=Path,
+            required=True,
+            help="existing research workspace",
+        )
+        command.add_argument(
+            "--batch-id",
+            required=True,
+            help="stable local migration batch identifier",
+        )
+        command.add_argument(
+            "--json",
+            action="store_true",
+            dest="json_output",
+            help="write aggregate JSON to stdout",
+        )
+
+    migrate_plan = migrate_commands.add_parser(
+        "plan",
+        help="preview an explicit migration without writing",
+    )
+    add_migration_identity(migrate_plan)
+    migrate_plan.add_argument(
+        "--source",
+        action="append",
+        type=Path,
+        required=True,
+        help="selected Markdown/PDF file or directory; repeat as needed",
+    )
+
+    migrate_apply = migrate_commands.add_parser(
+        "apply",
+        help="apply selected sources or resume an existing batch",
+    )
+    add_migration_identity(migrate_apply)
+    migrate_apply.add_argument(
+        "--source",
+        action="append",
+        type=Path,
+        default=[],
+        help="required for a new batch; omit to resume an existing batch",
+    )
+
+    migrate_verify = migrate_commands.add_parser(
+        "verify",
+        help="verify an existing batch by workspace and batch identifier",
+    )
+    add_migration_identity(migrate_verify)
+
+    migrate_rollback = migrate_commands.add_parser(
+        "rollback",
+        help="remove unchanged files owned by an existing batch",
+    )
+    add_migration_identity(migrate_rollback)
 
     host = commands.add_parser(
         "host",
@@ -376,6 +477,30 @@ def _pull_error_report(*, run: bool) -> dict[str, object]:
     }
 
 
+def _resume_error_report() -> dict[str, object]:
+    return {
+        "format_version": 1,
+        "generated_by": {"name": "scriptorium", "version": __version__},
+        "operation": "resume",
+        "status": "error",
+        "exit_code": 2,
+        "capsule": None,
+        "egress": {
+            "suite_managed": "not-requested",
+            "host_managed": "not-invoked",
+            "optional_connectors": "not-invoked",
+        },
+        "entry": {
+            "public_command": "prov-context",
+            "component_exit_code": None,
+            "stdout": "suppressed",
+            "stderr": "suppressed",
+        },
+        "errors": [{"code": "entry_error"}],
+        "limitations": ["No trusted context capsule was available."],
+    }
+
+
 def _status_error_report() -> dict[str, object]:
     return {
         "format_version": 1,
@@ -445,15 +570,54 @@ def _inventory_error_report() -> dict[str, object]:
     }
 
 
+def _migration_error_report(
+    *, operation: str, code: str = "entry_error"
+) -> dict[str, object]:
+    if operation not in {"plan", "apply", "verify", "rollback"}:
+        operation = "migration"
+    return {
+        "schema_version": MIGRATION_REPORT_VERSION,
+        "operation": operation,
+        "status": "error",
+        "summary": {
+            "sources_requested": 0,
+            "files": 0,
+            "markdown": 0,
+            "pdf": 0,
+            "bytes": 0,
+            "changed": 0,
+            "unchanged": 0,
+        },
+        "errors": [{"code": code}],
+        "limitations": list(MIGRATION_LIMITATIONS),
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     _configure_output()
     raw_argv = list(sys.argv[1:] if argv is None else argv)
     json_command = bool(
         raw_argv
-        and raw_argv[0] in {"init", "pull", "status", "inventory"}
+        and raw_argv[0] in {
+            "init",
+            "pull",
+            "resume",
+            "status",
+            "inventory",
+            "migrate",
+        }
         and "--json" in raw_argv
     )
-    private_usage_command = bool(raw_argv and raw_argv[0] == "inventory")
+    private_usage_command = bool(
+        raw_argv and raw_argv[0] in {"inventory", "resume", "migrate"}
+    )
+    migration_operation = (
+        raw_argv[1]
+        if len(raw_argv) > 1
+        and raw_argv[0] == "migrate"
+        and raw_argv[1] in {"plan", "apply", "verify", "rollback"}
+        else "migration"
+    )
     try:
         args = build_parser(
             json_errors=json_command or private_usage_command
@@ -461,7 +625,8 @@ def main(argv: list[str] | None = None) -> int:
     except _JsonUsageError:
         if private_usage_command and not json_command:
             print(
-                "ERROR: invalid inventory invocation; review scriptorium inventory --help.",
+                f"ERROR: invalid {raw_argv[0]} invocation; "
+                f"review scriptorium {raw_argv[0]} --help.",
                 file=sys.stderr,
             )
             return 2
@@ -469,8 +634,14 @@ def main(argv: list[str] | None = None) -> int:
             error_report = _init_error_report(run="--run" in raw_argv)
         elif raw_argv and raw_argv[0] == "pull":
             error_report = _pull_error_report(run="--run" in raw_argv)
+        elif raw_argv and raw_argv[0] == "resume":
+            error_report = _resume_error_report()
         elif raw_argv and raw_argv[0] == "inventory":
             error_report = _inventory_error_report()
+        elif raw_argv and raw_argv[0] == "migrate":
+            error_report = _migration_error_report(
+                operation=migration_operation
+            )
         else:
             error_report = _status_error_report()
         print(
@@ -666,6 +837,59 @@ def main(argv: list[str] | None = None) -> int:
         else:
             print(format_pull_report(pull_report))
         return int(pull_report["exit_code"])
+    if args.command == "resume":
+        selections = {
+            "provenance_root": root_selection(
+                args.provenance_root, "SCRIPTORIUM_PROVENANCE_ROOT"
+            ),
+        }
+        warnings: list[dict[str, object]] = []
+        try:
+            needs_config = (
+                args.config_dir is not None
+                or args.provenance_home is None
+                or args.project is None
+            )
+            suite_config = _load_suite_config(args.config_dir, needed=needs_config)
+            provenance_home, data_root_selection = select_configured_path(
+                args.provenance_home,
+                ("PROVENANCE_HOME",),
+                suite_config.provenance_home if suite_config else None,
+            )
+            selections = {
+                "data_root": data_root_selection,
+                **selections,
+            }
+            warnings = selection_warnings(selections)
+            project = args.project or (
+                suite_config.default_project if suite_config is not None else None
+            )
+            if provenance_home is None or project is None:
+                raise ResumeError(
+                    "Provenance home and project are required via flags, environment, or suite config"
+                )
+            resume_report = run_resume(
+                provenance_home=provenance_home,
+                provenance_root=args.provenance_root,
+                project=project,
+            )
+            attach_path_selection(resume_report, selections, warnings)
+        except (ConfigError, ResumeError):
+            if args.json_output:
+                error_report = _resume_error_report()
+                attach_path_selection(error_report, selections, warnings)
+                print(json.dumps(error_report, ensure_ascii=False, indent=2))
+            else:
+                print(
+                    "ERROR: context capsule unavailable; run scriptorium doctor for local diagnostics.",
+                    file=sys.stderr,
+                )
+            return 2
+        if args.json_output:
+            print(json.dumps(resume_report, ensure_ascii=False, indent=2))
+        else:
+            print(format_resume_report(resume_report))
+        return int(resume_report["exit_code"])
     if args.command == "status":
         selections = {
             "spec_root": root_selection(args.spec_root, "SCRIPTORIUM_SPEC_ROOT"),
@@ -779,6 +1003,88 @@ def main(argv: list[str] | None = None) -> int:
             return 2
         print(inventory_output)
         return inventory_exit_code
+    if args.command == "migrate":
+        try:
+            if args.migrate_command == "plan":
+                migration_result = plan_migration(
+                    args.source,
+                    workspace=args.workspace,
+                    batch_id=args.batch_id,
+                )
+            elif args.migrate_command == "apply":
+                migration_result = (
+                    apply_migration(
+                        plan_migration(
+                            args.source,
+                            workspace=args.workspace,
+                            batch_id=args.batch_id,
+                        )
+                    )
+                    if args.source
+                    else reapply_migration(
+                        workspace=args.workspace,
+                        batch_id=args.batch_id,
+                    )
+                )
+            elif args.migrate_command == "verify":
+                migration_result = verify_migration(
+                    workspace=args.workspace,
+                    batch_id=args.batch_id,
+                )
+            else:
+                migration_result = rollback_migration(
+                    load_migration(
+                        workspace=args.workspace,
+                        batch_id=args.batch_id,
+                    )
+                )
+        except MigrationError as exc:
+            if args.json_output:
+                print(
+                    json.dumps(
+                        _migration_error_report(
+                            operation=args.migrate_command,
+                            code=exc.code,
+                        ),
+                        ensure_ascii=False,
+                        indent=2,
+                    )
+                )
+            else:
+                print(
+                    f"ERROR: migrate {args.migrate_command} failed ({exc.code}).",
+                    file=sys.stderr,
+                )
+            return 2
+        # Migration reports are a privacy boundary; unexpected details stay local.
+        except Exception:
+            if args.json_output:
+                print(
+                    json.dumps(
+                        _migration_error_report(
+                            operation=args.migrate_command,
+                        ),
+                        ensure_ascii=False,
+                        indent=2,
+                    )
+                )
+            else:
+                print(
+                    f"ERROR: migrate {args.migrate_command} failed (entry_error).",
+                    file=sys.stderr,
+                )
+            return 2
+        if args.json_output:
+            print(
+                json.dumps(
+                    migration_result.report,
+                    ensure_ascii=False,
+                    indent=2,
+                )
+            )
+        else:
+            print(format_migration_report(migration_result.report))
+        return 0
     if args.command == "host" and args.host_command == "install":
         try:
             needs_config = (
