@@ -156,10 +156,12 @@ stage；后续重试不会扫描、认领或自动删除它，因此不会把竞
 回滚采用 `target -> target-quarantined -> anchor -> anchor-quarantined -> deleted`
 持久化状态机。每一步先记录 128-bit 随机同目录 quarantine 名，再用 Windows
 no-replace rename 或 Linux `renameat2(RENAME_NOREPLACE)` 原子移动，移动后重新验证
-哈希、大小和持久文件身份；错误替代文件只恢复或保留，不删除。平台不支持原子
-no-replace move、恢复路径被占用或身份不一致时均 fail closed。active batch 期间不得
-删除已登记的 `.scriptorium-*.stage` / `.scriptorium-*.rollback`；成功回滚最后清理
-已登记条目，未认领 orphan 只供人工核查。终端与
+哈希、大小和已记录文件身份；能由这些属性识别的外部替代文件只恢复或保留，不删除。
+该状态机协调单用户下的协作进程；最后一个链接消失后文件系统可能复用 inode/file ID，
+因此不宣称抵御恶意本地进程主动替换。平台不支持原子 no-replace move、恢复路径被占用
+或身份不一致时均 fail closed。active batch 期间不得删除已登记的
+`.scriptorium-*.stage` / `.scriptorium-*.rollback`；成功回滚最后清理已登记条目，
+未认领 orphan 只供人工核查。终端与
 JSON 报告、参数错误和运行时错误均不回显路径、文件名或正文。
 
 当前已由合成测试覆盖显式输入、无覆盖、拒绝链接/重解析点、进程退出释放锁、字节哈希
@@ -357,7 +359,7 @@ V0.4 是面向外部 Alpha 的产品验收，而不只是开发者测试：
    - 报告没有正文、邮箱、密钥和绝对路径；
    - 待审批内容没有自动变成正式状态。
 9. 重复运行相同步骤，验证没有重复记录、重复复制或字节漂移。
-10. 用 `migrate verify` 检查批次后，在隔离副本上执行 `migrate rollback`；回滚只能删除本批次确认创建且身份、字节均未变的副本，不会删除或覆盖替代文件；恢复受阻时必须保留 quarantine 并 fail closed。
+10. 用 `migrate verify` 检查批次后，在隔离副本上执行 `migrate rollback`；回滚只能删除本批次确认创建且身份、字节均未变的副本；能由记录属性识别的替代文件不会被删除或覆盖，恢复受阻时必须保留 quarantine 并 fail closed。该验收只覆盖单用户下的协作进程，不覆盖恶意本地替换。
 11. 用新会话运行 `resume`，确认只恢复已接受的状态，拒绝项、原始聊天和未审批草稿没有进入胶囊。
 12. 最终 UAT 报告只记录版本、操作系统、通过/失败、计数、匿名 ID、耗时和已知限制。公开前再做一次秘密、路径和私人关键词扫描。
 

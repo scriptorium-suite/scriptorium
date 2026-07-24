@@ -513,9 +513,10 @@ def execute(args: argparse.Namespace) -> dict[str, Any]:
         )
     try:
         import setuptools  # noqa: F401
-        import wheel  # noqa: F401
     except ImportError as exc:
-        raise LifecycleFailure("build-tooling", "Local wheel build tooling is unavailable.") from exc
+        raise LifecycleFailure(
+            "build-tooling", "The local setuptools build backend is unavailable."
+        ) from exc
     stages.append({"name": "build-tooling", "status": "passed"})
 
     with tempfile.TemporaryDirectory(prefix="scriptorium-install-lifecycle-") as raw:

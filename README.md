@@ -130,10 +130,13 @@ automatically.
 
 Rollback records a random same-directory quarantine name before each target and
 anchor transition, atomically moves without replacement, then re-verifies content
-and stable file identity before deletion. A foreign replacement is restored to its
-original path when possible, otherwise preserved in quarantine while rollback
-fails closed. Automatic rollback requires Windows no-replace rename or Linux
-`renameat2(RENAME_NOREPLACE)`; other platforms fail closed. Private
+and recorded file identity before deletion. A replacement detectable through
+those recorded properties is restored to its original path when possible,
+otherwise preserved in quarantine while rollback fails closed. This coordinates
+cooperative local processes; it does not claim protection against a malicious
+replacement after every link to a file identity has disappeared, because a
+filesystem may reuse that identity. Automatic rollback requires Windows no-replace
+rename or Linux `renameat2(RENAME_NOREPLACE)`; other platforms fail closed. Private
 path manifests use the canonical per-user local state root outside the workspace;
 sources may not overlap that private state root, and no arbitrary state-root flag
 is exposed. Terminal

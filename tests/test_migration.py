@@ -704,8 +704,12 @@ print(json.dumps({
             ):
                 replaced = True
                 replacement = migration_module._stage(manifest, entry)
-                replacement.unlink()
-                replacement.write_bytes(source.read_bytes())
+                foreign = replacement.with_name(f"{replacement.name}.foreign")
+                foreign.write_bytes(source.read_bytes())
+                self.assertNotEqual(
+                    entry["file_identity"], migration_module._file_identity(foreign)
+                )
+                os.replace(foreign, replacement)
 
         with mock.patch(
             "scriptorium.migration._persist_manifest",
@@ -787,9 +791,10 @@ print(json.dumps({
         entry = current["entries"][0]
         target = Path(entry["target"])
         anchor = migration_module._stage(current, entry)
+        foreign = anchor.with_name(f"{anchor.name}.foreign")
+        foreign.write_bytes(source.read_bytes())
         target.unlink()
-        anchor.unlink()
-        anchor.write_bytes(source.read_bytes())
+        os.replace(foreign, anchor)
         self.assertNotEqual(
             entry["file_identity"], migration_module._file_identity(anchor)
         )
