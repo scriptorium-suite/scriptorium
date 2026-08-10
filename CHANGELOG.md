@@ -1,6 +1,8 @@
 # Changelog
 
-## 0.2.0 (candidate) — 2026-07-22
+## 0.2.0 — 2026-08-10
+
+- Publish the checksum-pinned Capture v1.0.0 asset for direct `capture` profile installation.
 
 - Add `scriptorium resume`, backed by Provenance's bounded, read-only Context
   Capsule. It restores approved project state, explicitly labels auto-applied

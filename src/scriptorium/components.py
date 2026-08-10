@@ -15,8 +15,12 @@ COMPONENT_ID_RE = re.compile(r"^[a-z][a-z0-9-]*$")
 REVISION_RE = re.compile(r"^[0-9a-f]{40}$")
 SHA256_RE = re.compile(r"^[0-9a-f]{64}$")
 DIRECTORY_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+ARTIFACT_URL_RE = re.compile(
+    r"^https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/releases/download/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$"
+)
 STABILITIES = {"stable", "candidate", "experimental"}
 DELIVERIES = {"source", "python-source", "workspace-source", "release-asset"}
+ARTIFACT_STATUSES = {"source-build-only", "published"}
 
 
 class ComponentCatalogError(RuntimeError):
@@ -36,6 +40,7 @@ class Component:
     owner: str | None = None
     artifact_name: str | None = None
     artifact_status: str | None = None
+    artifact_url: str | None = None
     artifact_sha256: str | None = None
 
 
@@ -69,6 +74,7 @@ def _load_component(component_id: str, raw: object) -> Component:
         "owner",
         "artifact_name",
         "artifact_status",
+        "artifact_url",
         "artifact_sha256",
     }
     extra = set(data) - allowed
@@ -89,22 +95,34 @@ def _load_component(component_id: str, raw: object) -> Component:
     owner = data.get("owner")
     artifact_name = data.get("artifact_name")
     artifact_status = data.get("artifact_status")
+    artifact_url = data.get("artifact_url")
     artifact_sha256 = data.get("artifact_sha256")
     for name, value in (
         ("owner", owner),
         ("artifact_name", artifact_name),
         ("artifact_status", artifact_status),
+        ("artifact_url", artifact_url),
         ("artifact_sha256", artifact_sha256),
     ):
         if value is not None and (not isinstance(value, str) or not value.strip()):
             raise ComponentCatalogError(f"{where}.{name} must be a non-empty string")
     if delivery == "release-asset" and not artifact_name:
         raise ComponentCatalogError(f"{where}.artifact_name is required")
+    if delivery == "release-asset" and artifact_status not in ARTIFACT_STATUSES:
+        raise ComponentCatalogError(f"{where}.artifact_status is invalid")
     if delivery == "release-asset" and (
         not isinstance(artifact_sha256, str)
         or not SHA256_RE.fullmatch(artifact_sha256)
     ):
         raise ComponentCatalogError(f"{where}.artifact_sha256 is required")
+    if artifact_url is not None and (
+        not ARTIFACT_URL_RE.fullmatch(artifact_url)
+        or not isinstance(artifact_name, str)
+        or not artifact_url.endswith(f"/{artifact_name}")
+    ):
+        raise ComponentCatalogError(f"{where}.artifact_url is invalid")
+    if delivery == "release-asset" and artifact_status == "published" and artifact_url is None:
+        raise ComponentCatalogError(f"{where}.artifact_url is required for a published asset")
     directory = _required_string(data, "directory", where=where)
     if not DIRECTORY_RE.fullmatch(directory) or directory in {".", ".."}:
         raise ComponentCatalogError(f"{where}.directory must be one safe path segment")
@@ -120,6 +138,7 @@ def _load_component(component_id: str, raw: object) -> Component:
         owner=owner,
         artifact_name=artifact_name,
         artifact_status=artifact_status,
+        artifact_url=artifact_url,
         artifact_sha256=artifact_sha256,
     )
 
@@ -189,6 +208,7 @@ def build_component_report(profile: str | None = None) -> dict[str, object]:
                 "owner": component.owner,
                 "artifact_name": component.artifact_name,
                 "artifact_status": component.artifact_status,
+                "artifact_url": component.artifact_url,
                 "artifact_sha256": component.artifact_sha256,
                 "repository": component.repository,
                 "revision": component.revision,

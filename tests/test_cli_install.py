@@ -6,8 +6,10 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from scriptorium import cli
+from scriptorium.installer import InstallError
 
 
 class InstallCliTests(unittest.TestCase):
@@ -30,23 +32,34 @@ class InstallCliTests(unittest.TestCase):
             self.assertEqual(report["writes"], "none")
             self.assertFalse(target.exists())
 
-    def test_capture_run_fails_without_creating_target_until_asset_exists(self):
+    def test_capture_run_marks_target_failed_when_download_fails(self):
         with tempfile.TemporaryDirectory() as temporary:
             target = Path(temporary) / "capture"
-            code, report, stderr = self.invoke(
-                [
-                    "install",
-                    "capture",
-                    "--target",
-                    str(target),
-                    "--run",
-                    "--json",
-                ]
-            )
+
+            def failing_download(_component, _destination):
+                raise InstallError("release asset download failed", code="asset_download")
+
+            with mock.patch(
+                "scriptorium.installer._download_release_asset",
+                side_effect=failing_download,
+            ):
+                code, report, stderr = self.invoke(
+                    [
+                        "install",
+                        "capture",
+                        "--target",
+                        str(target),
+                        "--run",
+                        "--json",
+                    ]
+                )
             self.assertEqual(code, 2)
             self.assertEqual(stderr, "")
-            self.assertEqual(report["errors"], [{"code": "artifact_unpublished"}])
-            self.assertFalse(target.exists())
+            self.assertEqual(report["errors"], [{"code": "asset_download"}])
+            marker = json.loads(
+                (target / ".scriptorium-install.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(marker["state"], "failed")
 
     def test_unknown_profile_is_a_stable_json_error(self):
         with tempfile.TemporaryDirectory() as temporary:

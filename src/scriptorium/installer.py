@@ -11,6 +11,10 @@ import subprocess
 import zipfile
 from pathlib import Path
 from pathlib import PurePosixPath
+from tempfile import TemporaryDirectory
+from urllib.error import URLError
+from urllib.parse import urlsplit
+from urllib.request import Request, urlopen
 from uuid import uuid4
 
 from . import __version__
@@ -29,6 +33,8 @@ REPORT_VERSION = 1
 MAX_ASSET_ENTRIES = 100
 MAX_ASSET_BYTES = 10 * 1024 * 1024
 COMMAND_TIMEOUT_SECONDS = 300
+DOWNLOAD_TIMEOUT_SECONDS = 60
+DOWNLOAD_CHUNK_BYTES = 64 * 1024
 
 
 class InstallError(RuntimeError):
@@ -155,6 +161,63 @@ def _file_sha256(path: Path) -> str:
     except OSError as exc:
         raise InstallError("release asset is unreadable", code="asset_unreadable") from exc
     return digest.hexdigest()
+
+
+def _download_release_asset(component: Component, destination: Path) -> None:
+    if component.artifact_url is None:
+        raise InstallError("release asset is unpublished", code="artifact_unpublished")
+    request = Request(
+        component.artifact_url,
+        headers={"User-Agent": f"scriptorium/{__version__}"},
+    )
+    try:
+        with urlopen(request, timeout=DOWNLOAD_TIMEOUT_SECONDS) as response:
+            final = urlsplit(response.geturl())
+            hostname = final.hostname or ""
+            if (
+                final.scheme != "https"
+                or (
+                    hostname != "github.com"
+                    and not hostname.endswith(".githubusercontent.com")
+                )
+                or final.username is not None
+                or final.password is not None
+                or final.port not in {None, 443}
+            ):
+                raise InstallError(
+                    "release asset redirected outside the trusted host boundary",
+                    code="asset_download",
+                )
+            declared_size = response.headers.get("Content-Length")
+            if declared_size is not None:
+                try:
+                    parsed_size = int(declared_size)
+                except ValueError as exc:
+                    raise InstallError(
+                        "release asset size is invalid", code="asset_download"
+                    ) from exc
+                if parsed_size < 0 or parsed_size > MAX_ASSET_BYTES:
+                    raise InstallError(
+                        "release asset is too large", code="asset_invalid"
+                    )
+            total = 0
+            with destination.open("xb") as stream:
+                while True:
+                    chunk = response.read(DOWNLOAD_CHUNK_BYTES)
+                    if not chunk:
+                        break
+                    total += len(chunk)
+                    if total > MAX_ASSET_BYTES:
+                        raise InstallError(
+                            "release asset is too large", code="asset_invalid"
+                        )
+                    stream.write(chunk)
+    except InstallError:
+        raise
+    except (OSError, URLError, ValueError) as exc:
+        raise InstallError(
+            "release asset download failed", code="asset_download"
+        ) from exc
 
 
 def _validate_local_asset(component: Component, asset: Path) -> Path:
@@ -525,8 +588,18 @@ def execute_install(
                 continue
             if component.delivery == "release-asset":
                 if asset is None:
-                    raise InstallError("release-asset download is unavailable", code="artifact_unpublished")
-                _install_release_asset(component, _validate_local_asset(component, asset), destination)
+                    with TemporaryDirectory(prefix="scriptorium-asset-") as temporary:
+                        downloaded = Path(temporary) / str(component.artifact_name)
+                        _download_release_asset(component, downloaded)
+                        _install_release_asset(
+                            component,
+                            _validate_local_asset(component, downloaded),
+                            destination,
+                        )
+                else:
+                    _install_release_asset(
+                        component, _validate_local_asset(component, asset), destination
+                    )
             else:
                 _install_source(component, destination)
         _write_environment_scripts(resolved_target, components)

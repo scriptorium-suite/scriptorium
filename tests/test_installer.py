@@ -40,16 +40,38 @@ class InstallerTests(unittest.TestCase):
             )
             self.assertFalse(target.exists())
 
-    def test_capture_preview_is_honest_about_unpublished_asset(self):
+    def test_capture_preview_reports_published_asset_as_available(self):
         with tempfile.TemporaryDirectory() as temporary:
             target = Path(temporary) / "capture"
             report = plan_install(profile="capture", target=target)
-            self.assertEqual(report["status"], "action-required")
-            self.assertEqual(report["summary"]["unavailable"], 1)
-            self.assertFalse(report["actions"][0]["available"])
-            with self.assertRaisesRegex(InstallError, "unpublished"):
-                execute_install(profile="capture", target=target)
+            self.assertEqual(report["status"], "planned")
+            self.assertEqual(report["summary"]["unavailable"], 0)
+            self.assertTrue(report["actions"][0]["available"])
             self.assertFalse(target.exists())
+
+    def test_published_capture_download_installs_without_provenance(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            asset = root / "source.zip"
+            with zipfile.ZipFile(asset, "w") as archive:
+                archive.writestr("manifest.json", '{"manifest_version": 3}')
+            catalog = self.capture_catalog(asset)
+            target = root / "capture-only"
+
+            def fake_download(_component, destination):
+                destination.write_bytes(asset.read_bytes())
+
+            with mock.patch(
+                "scriptorium.installer._download_release_asset",
+                side_effect=fake_download,
+            ):
+                report = execute_install(
+                    profile="capture", target=target, catalog=catalog
+                )
+
+            self.assertEqual(report["status"], "installed")
+            self.assertTrue((target / "capture" / "unpacked" / "manifest.json").is_file())
+            self.assertFalse((target / "Provenance").exists())
 
     def test_downloaded_capture_asset_installs_without_cloning_provenance(self):
         with tempfile.TemporaryDirectory() as temporary:

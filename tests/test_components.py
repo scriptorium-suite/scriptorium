@@ -14,6 +14,8 @@ class ComponentCatalogTests(unittest.TestCase):
         capture = catalog.components["capture"]
         self.assertEqual(capture.owner, "provenance")
         self.assertEqual(capture.delivery, "release-asset")
+        self.assertEqual(capture.artifact_status, "published")
+        self.assertTrue(capture.artifact_url.endswith(capture.artifact_name))
         self.assertNotIn("capture", catalog.profiles["core"])
 
     def test_core_profile_selects_only_contract_and_memory_core(self):
