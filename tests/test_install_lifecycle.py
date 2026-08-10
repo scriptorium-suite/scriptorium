@@ -102,6 +102,78 @@ class TransitionTests(unittest.TestCase):
         self.assertEqual(LIFECYCLE.release_relation("local", "0.4.0"), "unsupported")
 
 
+class StandaloneComponentTests(unittest.TestCase):
+    def test_provenance_is_read_only_and_steward_is_preview_first(self):
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            scripts = root / "scripts"
+            scripts.mkdir()
+            env = {"PATH": str(scripts)}
+            calls = []
+
+            def fake_run(command, *, stage, cwd, env, timeout=180):
+                arguments = [str(value) for value in command]
+                calls.append((stage, arguments, dict(env)))
+                if stage == "standalone-provenance":
+                    self.assertEqual(
+                        Path(env["PROVENANCE_HOME"]).name,
+                        "standalone-provenance",
+                    )
+                if stage.startswith("standalone-steward") and "--run" in arguments:
+                    vault = Path(arguments[arguments.index("--vault") + 1])
+                    dashboard = vault / "Projects" / "_总纲.md"
+                    if not dashboard.exists():
+                        dashboard.write_text(
+                            "<!-- steward:portfolio:begin -->\n"
+                            "synthetic-system\n"
+                            "<!-- steward:portfolio:end -->\n",
+                            encoding="utf-8",
+                        )
+                return mock.Mock(returncode=0, stdout="", stderr="")
+
+            with mock.patch.object(LIFECYCLE, "run", side_effect=fake_run):
+                LIFECYCLE.verify_standalone_components(
+                    scripts,
+                    root=root,
+                    env=env,
+                )
+
+            stages = [stage for stage, _, _ in calls]
+            self.assertEqual(
+                stages,
+                [
+                    "standalone-provenance",
+                    "standalone-steward-preview",
+                    "standalone-steward-run",
+                    "standalone-steward-idempotent",
+                ],
+            )
+
+    def test_rejects_a_provenance_status_write(self):
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            scripts = root / "scripts"
+            scripts.mkdir()
+
+            def fake_run(command, *, stage, cwd, env, timeout=180):
+                if stage == "standalone-provenance":
+                    (Path(env["PROVENANCE_HOME"]) / "unexpected.txt").write_text(
+                        "unexpected",
+                        encoding="utf-8",
+                    )
+                return mock.Mock(returncode=0, stdout="", stderr="")
+
+            with mock.patch.object(LIFECYCLE, "run", side_effect=fake_run):
+                with self.assertRaises(LIFECYCLE.LifecycleFailure) as raised:
+                    LIFECYCLE.verify_standalone_components(
+                        scripts,
+                        root=root,
+                        env={"PATH": str(scripts)},
+                    )
+
+            self.assertEqual(raised.exception.stage, "standalone-provenance")
+
+
 class ReportTests(unittest.TestCase):
     def test_report_is_created_once_and_not_replaced(self):
         with tempfile.TemporaryDirectory() as raw:

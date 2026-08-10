@@ -9,6 +9,11 @@ import sys
 from pathlib import Path
 
 from . import __version__
+from .components import (
+    ComponentCatalogError,
+    build_component_report,
+    format_component_report,
+)
 from .config import ConfigError, SuiteConfig, load_config
 from .demo import DemoError, run_demo
 from .doctor import DoctorError, TARGETS, format_doctor_report, run_doctor
@@ -19,7 +24,8 @@ from .host import (
     run_host_install,
 )
 from .inventory import format_inventory_report, run_inventory
-from .init import InitError, format_init_report, run_init
+from .init import PROJECT_TEMPLATES, InitError, format_init_report, run_init
+from .installer import InstallError, execute_install, format_install_report, plan_install
 from .migration import (
     MIGRATION_LIMITATIONS,
     REPORT_VERSION as MIGRATION_REPORT_VERSION,
@@ -68,10 +74,48 @@ def build_parser(*, json_errors: bool = False) -> argparse.ArgumentParser:
     parser_class = _JsonArgumentParser if json_errors else argparse.ArgumentParser
     parser = parser_class(
         prog="scriptorium",
-        description="Agent-native research workflow suite (Public Alpha candidate).",
+        description="Local-first project context and continuity suite.",
     )
     parser.add_argument("--version", action="version", version=f"scriptorium {__version__}")
     commands = parser.add_subparsers(dest="command", required=True)
+
+    components = commands.add_parser(
+        "components",
+        help="show the pinned suite components and selectable product profiles",
+    )
+    components.add_argument(
+        "--profile",
+        default="core",
+        help="component profile to inspect (default: core)",
+    )
+    components.add_argument(
+        "--json", action="store_true", dest="json_output", help="write JSON to stdout"
+    )
+
+    install = commands.add_parser(
+        "install",
+        help="preview or install one pinned component profile",
+    )
+    install.add_argument("profile")
+    install.add_argument(
+        "--target",
+        type=Path,
+        required=True,
+        help="empty or Scriptorium-owned component directory",
+    )
+    install.add_argument(
+        "--asset",
+        type=Path,
+        help="downloaded release asset for an artifact-only profile",
+    )
+    install.add_argument(
+        "--run",
+        action="store_true",
+        help="clone and prepare the exact reviewed component set",
+    )
+    install.add_argument(
+        "--json", action="store_true", dest="json_output", help="write JSON to stdout"
+    )
 
     demo = commands.add_parser(
         "demo",
@@ -89,12 +133,18 @@ def build_parser(*, json_errors: bool = False) -> argparse.ArgumentParser:
 
     initialize = commands.add_parser(
         "init",
-        help="preview or create a minimal real research workspace and suite config",
+        help="preview or create a minimal project workspace and suite config",
     )
     initialize.add_argument("--workspace", type=Path, required=True)
     initialize.add_argument("--provenance-home", type=Path, required=True)
     initialize.add_argument("--project-id", required=True)
     initialize.add_argument("--title", required=True)
+    initialize.add_argument(
+        "--template",
+        choices=PROJECT_TEMPLATES,
+        default="general",
+        help="project note template (default: general)",
+    )
     initialize.add_argument(
         "--host",
         action="append",
@@ -109,8 +159,10 @@ def build_parser(*, json_errors: bool = False) -> argparse.ArgumentParser:
         help="existing session working directory (default: workspace)",
     )
     initialize.add_argument(
+        "--context",
         "--idea",
-        help="optional user-authored research intuition for the project note",
+        dest="idea",
+        help="optional user-authored initial context for the project note",
     )
     initialize.add_argument(
         "--config-dir",
@@ -160,7 +212,7 @@ def build_parser(*, json_errors: bool = False) -> argparse.ArgumentParser:
     pull.add_argument(
         "--workspace",
         type=Path,
-        help="existing Markdown research workspace (or use suite config)",
+        help="existing Scriptorium project workspace (or use suite config)",
     )
     pull.add_argument(
         "--provenance-home",
@@ -211,7 +263,7 @@ def build_parser(*, json_errors: bool = False) -> argparse.ArgumentParser:
 
     status = commands.add_parser(
         "status",
-        help="show content-free readiness and pending research workflow counts",
+        help="show content-free readiness and pending project workflow counts",
     )
     status.add_argument(
         "--json", action="store_true", dest="json_output", help="write JSON to stdout"
@@ -223,7 +275,7 @@ def build_parser(*, json_errors: bool = False) -> argparse.ArgumentParser:
     status.add_argument(
         "--workspace",
         type=Path,
-        help="existing Markdown research workspace (or use suite config)",
+        help="existing Scriptorium project workspace (or use suite config)",
     )
     status.add_argument(
         "--provenance-home",
@@ -242,7 +294,7 @@ def build_parser(*, json_errors: bool = False) -> argparse.ArgumentParser:
 
     inventory = commands.add_parser(
         "inventory",
-        help="inventory explicit local research sources and preview safe routing",
+        help="inventory explicit local project sources and preview safe routing",
     )
     inventory.add_argument(
         "--source",
@@ -282,7 +334,7 @@ def build_parser(*, json_errors: bool = False) -> argparse.ArgumentParser:
             "--workspace",
             type=Path,
             required=True,
-            help="existing research workspace",
+            help="existing Scriptorium project workspace",
         )
         command.add_argument(
             "--batch-id",
@@ -341,13 +393,13 @@ def build_parser(*, json_errors: bool = False) -> argparse.ArgumentParser:
     host_commands = host.add_subparsers(dest="host_command", required=True)
     host_install = host_commands.add_parser(
         "install",
-        help="install the canonical research skill without changing global host settings",
+        help="install the canonical project skill without changing global host settings",
     )
     host_install.add_argument("host", choices=HOSTS, help="agent host to configure")
     host_install.add_argument(
         "--workspace",
         type=Path,
-        help="existing research workspace (or use suite config)",
+        help="existing Scriptorium project workspace (or use suite config)",
     )
     host_install.add_argument(
         "--dry-run",
@@ -605,6 +657,8 @@ def main(argv: list[str] | None = None) -> int:
             "status",
             "inventory",
             "migrate",
+            "components",
+            "install",
         }
         and "--json" in raw_argv
     )
@@ -665,6 +719,63 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Search evidence: {root / 'workspace' / 'Reports' / 'provenance-search.txt'}")
         print(f"Report: {demo_report}")
         return 0
+    if args.command == "components":
+        try:
+            component_report = build_component_report(args.profile)
+        except ComponentCatalogError as exc:
+            if args.json_output:
+                print(
+                    json.dumps(
+                        {
+                            "format_version": 1,
+                            "operation": "components",
+                            "status": "error",
+                            "exit_code": 2,
+                            "errors": [{"code": "catalog_invalid"}],
+                        },
+                        ensure_ascii=False,
+                        indent=2,
+                    )
+                )
+            else:
+                print(f"ERROR: {exc}", file=sys.stderr)
+            return 2
+        if args.json_output:
+            print(json.dumps(component_report, ensure_ascii=False, indent=2))
+        else:
+            print(format_component_report(component_report))
+        return 0
+    if args.command == "install":
+        try:
+            install_report = (
+                execute_install(profile=args.profile, target=args.target, asset=args.asset)
+                if args.run
+                else plan_install(profile=args.profile, target=args.target, asset=args.asset)
+            )
+        except InstallError as exc:
+            if args.json_output:
+                print(
+                    json.dumps(
+                        {
+                            "format_version": 1,
+                            "operation": "install",
+                            "mode": "run" if args.run else "preview",
+                            "status": "error",
+                            "exit_code": 2,
+                            "errors": [{"code": exc.code}],
+                        },
+                        ensure_ascii=False,
+                        indent=2,
+                    )
+                )
+            else:
+                print(f"ERROR: {exc}", file=sys.stderr)
+            return 2
+        if args.json_output:
+            print(json.dumps(install_report, ensure_ascii=False, indent=2))
+        else:
+            print(format_install_report(install_report))
+        return int(install_report["exit_code"])
     if args.command == "init":
         try:
             init_report = run_init(
@@ -675,6 +786,7 @@ def main(argv: list[str] | None = None) -> int:
                 hosts=args.hosts,
                 linked_repo=args.linked_repo,
                 idea=args.idea,
+                template=args.template,
                 config_dir=args.config_dir,
                 run=args.run,
             )

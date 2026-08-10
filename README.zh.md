@@ -1,21 +1,73 @@
 # Scriptorium
 
+Scriptorium 是面向长期复杂工作的本地优先、模型中立的项目上下文与协作记忆产品。
+本仓库是统一产品入口，通过公开命令和版本化文件协调彼此独立的组件，不导入组件内部
+实现，也不取得用户项目资料的所有权。科研是要求最高的旗舰示例，而不是产品边界；
+同一核心也支持工程系统维护和个人软件开发项目。
+
+`scriptorium components --profile <名称>` 可以查看 `core`、`research`、`slides`、
+`full` 或 `capture` 对应的固定组件、版本和提交。`scriptorium install <名称>
+--target <目录>` 默认只预览，用户明确增加 `--run` 后才会联网安装。Capture 不是
+独立仓库，而是 Provenance 维护的可选浏览器导出器；正式发布时通过单独 Release ZIP
+交付。附件尚未实际发布前，命令会明确提示不可用，不会伪装成已经完成。
+
+`scriptorium init` 默认生成通用项目模板，也支持 `--template engineering`、
+`--template software` 和 `--template research`。这些模板共享同一套项目身份、状态、
+会话收尾和上下文恢复机制。
+
+已有项目按资料类型显式接入，而不是整盘扫描或整仓复制：代码和工程仓库通过
+`init --linked-repo` 登记并继续作为权威来源；用户挑选的 Markdown/PDF 才进入
+`inventory -> migrate`；本地 Agent 日志或 Capture 导出由 Provenance 接入；只有需要
+Zotero 和文献治理时才增加 Steward。仅仅登记仓库不会复制其中的源码、凭据或个人目录。
+
 > **Public Alpha v0.2.0 候选版：** 当前 umbrella 仓库已交付真实项目的安全初始化、一个
 > 通过 `scriptorium demo` 跑通的合成纵向切片、只读诊断入口 `scriptorium doctor`、
 > 不暴露内容的 `scriptorium status` 控制面状态摘要、仅盘点显式本地来源且零写入的
 > `scriptorium inventory` 预览，以及显式、项目级的 Codex /
 > Claude Code 技能安装器。已确认的按需入口 `scriptorium pull` 与有边界、只读的
 > `scriptorium resume` Context Capsule 均通过 Provenance 的机器可读公共命令交付。
-> 经过安全复审的 `scriptorium migrate` CLI 已作为 V0.3 候选能力加入，但不代表
-> V0.3 已经发布或验收完成。
-> 已发布基线具有 GitHub-hosted Windows 证据；当前工作树也已在本地通过合成迁移、
-> 安装、卸载、重装、v0.1.0 到当前候选版的版本切换，以及 Steward-to-Lectern
-> 检查，但仍需重新运行远端 CI。Agent host 实时
-> 对等路径和真实 provider 幻灯片生成仍是人工 Alpha 门槛。
+> 经过安全复审的 `scriptorium migrate` 已纳入稳定核心候选版，只复制用户显式选择的
+> Markdown/PDF，不会把整座代码仓库或个人目录自动搬入工作区。
+> 已发布基线具有 GitHub-hosted Windows 证据；当前工作树也已在本地通过 core、
+> research 组合与 Capture-only 安装，以及软件项目经 Codex / Claude Code 两种工作区
+> 适配器恢复相同上下文的合成验收。重新运行远端 CI、真实模型登录和真实 provider
+> 幻灯片生成仍是发布门槛。
 
-Scriptorium 是面向科研工作者的本地优先、Agent 原生研究工作流套件。本仓库是
-它的薄控制面：通过公开 CLI 与版本化文件编排可独立使用的组件，不导入组件内部
-模块，也不成为论文库、项目笔记或科研记忆的新数据主库。
+稳定核心候选版有意停在资料接入、会话收尾、人工审批和上下文恢复。实验运行、
+论断—证据晋升等增强能力继续保存在开发分支，不进入当前组件目录，也不计入稳定核心
+的可用性声明。
+
+## Windows 最短使用路径
+
+克隆本入口仓库并执行 `uv sync --locked` 后，先查看将要安装的固定组件和提交；只有
+确认无误后才增加 `--run`：
+
+```powershell
+uv run scriptorium components --profile core
+uv run scriptorium install core --target D:\Scriptorium\components
+uv run scriptorium install core --target D:\Scriptorium\components --run
+. D:\Scriptorium\components\scriptorium-env.ps1
+
+uv run scriptorium init `
+  --workspace D:\Projects\my-project `
+  --provenance-home D:\Projects\my-project-memory `
+  --project-id my-project `
+  --title "我的长期项目" `
+  --template software `
+  --host codex `
+  --run
+uv run scriptorium host install codex
+
+# 在该工作区完成一次 Agent 协作后：
+uv run scriptorium pull --project my-project --json
+uv run scriptorium pull --project my-project --run --json
+# 按报告完成 Agent 填充或 Approvals.md 审阅，再次 pull 后继续：
+uv run scriptorium resume --project my-project
+```
+
+需要文献治理时选择 `research` 组合，它只在核心上增加 Steward。只需要浏览器导出器时，
+使用已校验的 Capture Release ZIP；该路径不会克隆 Provenance。Provenance、Steward 和
+Lectern 仍可分别从各自仓库独立使用。
 
 [English](README.md) · [架构、使用与分层验收](docs/architecture-and-acceptance.zh-CN.md) · [中文产品案例](docs/case-study.zh-CN.md) · [展示与证据](docs/showcase/README.zh-CN.md) · [契约单一事实源](https://github.com/scriptorium-suite/scriptorium-spec) · [设计借鉴与致谢](ACKNOWLEDGEMENTS.zh.md)
 
@@ -23,8 +75,9 @@ Scriptorium 是面向科研工作者的本地优先、Agent 原生研究工作�
 
 ## 当前真正可用的内容
 
-`scriptorium init` 可以预览或创建真实科研项目的最小结构：套件配置、彼此分离的
-Markdown workspace 与 Provenance 数据根目录，以及一份有效的 `project/1.0` 项目笔记。
+`scriptorium init` 可以预览或创建真实长期项目的最小结构：套件配置、彼此分离的
+Markdown workspace 与 Provenance 数据根目录，以及一份有效的 `project/1.1` 项目笔记
+（旧的 `project/1.0` 仍可读取）。
 默认只预览，必须显式增加 `--run` 才会写入；已有文件不会被重写。选择 host 只会把
 该选择记录到配置中，不会安装 host adapter、模型或 hook；init 不申请网络动作，也不
 读取 provider 凭据。初始化后，如果没有更高优先级的 CLI 参数或环境变量，
@@ -79,12 +132,12 @@ V0.2 端到端夹具会连续运行两个合成 Agent 会话，并验证第二�
 `scriptorium status` 是日常使用且不暴露内容的控制面状态摘要。它先重建 `doctor` 的
 Public Alpha 就绪结论；只有该边界就绪时，才执行一次 `pull` 预览。结果只包含
 白名单化的能力状态、工作流聚合计数和固定审阅提示，不会透传本地路径、项目或会话
-标识、科研正文、组件 stderr 或原始诊断细节，也绝不会调用 `--run`。`attention`
+标识、项目正文、组件 stderr 或原始诊断细节，也绝不会调用 `--run`。`attention`
 是正常的 exit-0 待办；未就绪或安全阻断返回 1，可信 pull 预览报告错误或入口无法
 形成可信报告时返回 2。status 与其中的预览都不会授权套件写入项目或数据；就绪检查
 仍会调用外部版本/能力探针，其操作系统级副作用尚未被观测。
 
-`scriptorium inventory` 是已有科研资料进入套件前的安全盘点边界。它只扫描用户显式
+`scriptorium inventory` 是已有项目资料进入套件前的安全盘点边界。它只扫描用户显式
 传入的 Markdown/PDF 来源、AI 对话导出或 Zotero 导出；只读取文件系统元数据与后缀，
 不会打开正文或压缩包、自动发现个人目录、写入迁移计划、调用组件、申请网络动作或
 调用模型。默认报告不含路径和文件名，只给出候选总数以及 workspace、文献原址引用、
@@ -92,7 +145,7 @@ Provenance 导入审阅、Steward 审阅四类路由。该预览不验证文件�
 资料，也不会声称迁移已经发生。在 Windows 上，命令会在预览期间以仅元数据句柄绑定
 选中对象，因此其他进程需等命令结束后才能重命名、删除或以数据写权限打开这些对象。
 
-`scriptorium migrate` 是 V0.3 候选版的显式 Markdown/PDF 复制边界。`plan`
+`scriptorium migrate` 是稳定核心候选版的显式 Markdown/PDF 复制边界。`plan`
 零写入；首次 `apply` 必须再次给出已核对的来源；后续 `apply`、`verify` 和
 `rollback` 只凭 workspace 与批次标识恢复。预览只是 advisory，不是持久化执行快照；
 首次 `apply` 会重新扫描并哈希显式来源。目标文件通过同目录 hard link 以
@@ -151,11 +204,11 @@ python -m venv .venv
 ```
 
 该命令只做分类，始终保持 preview 模式。默认终端输出与 `--json` 都只包含计数和固定
-路由标签，不含本地路径、文件名、科研正文、哈希、大小或时间。扫描不完整或来源不安全
+路由标签，不含本地路径、文件名、资料正文、哈希、大小或时间。扫描不完整或来源不安全
 时会 fail closed 并返回退出码 `1`；参数错误或入口边界内部失败返回 `2`，且不会回显
 敏感输入。
 
-### V0.3 候选：安全复制显式 Markdown/PDF
+### 安全复制显式选择的 Markdown/PDF
 
 先给批次一个稳定标识并检查聚合预览；首次执行时再次传入相同来源：
 
@@ -195,8 +248,8 @@ $Batch = 'legacy-notes-001'
 link；不支持时命令会 fail closed，不会降级到可能覆盖目标的方式。批次生效期间不要
 删除内部 `.scriptorium-*.stage` 所有权锚点或 `.scriptorium-*.rollback` quarantine；
 成功回滚会清理已登记条目。若进程在随机 stage 登记前崩溃，未认领 stage 只供人工核查，
-Scriptorium 不会认领或自动删除。在完整 V0.3
-验收完成前，只应对合成资料或隔离副本使用该候选能力。
+Scriptorium 不会认领或自动删除。首次使用时应先在合成资料或隔离副本上验证，审阅
+聚合计划，并在 `verify` 成功前继续把原始来源视为权威副本。
 
 ### 真实项目的 10 分钟路径
 
@@ -341,7 +394,7 @@ scriptorium pull --workspace D:\Research\Workspace --provenance-home D:\Research
 scriptorium resume --provenance-home D:\Research\ProvenanceData --project my-project
 ```
 
-两个路径都必须已经存在；Scriptorium 永不把当前目录隐式当作科研数据根。已登记的
+两个路径都必须已经存在；Scriptorium 永不把当前目录隐式当作项目数据根。已登记的
 canonical Codex adapter 会启用保守的本地日志扫描（只收已登记项目、最近且稳定的日志、
 排除 Desktop）。安装 Claude Code skill 不等于其可选 `SessionEnd` enqueue hook 已安装或
 完成 live 验证；该捕获路径仍需用户单独显式配置。`--project` 只收窄 Codex 发现范围，
@@ -350,14 +403,15 @@ workspace 摄取和已有同步队列仍是 workspace-wide。
 如果报告出现 `project-resolution`，对应事件会继续保留在受保护的 inflight 状态；
 Scriptorium 不会为未解析项目生成摘要、timeline 或 draft。请在 Markdown workspace 中
 批准或补充正确的 `project_id` / `linked_repo` 映射，再次 pull 后会继续原事件而不是将其
-退休。canonical research skill 通过默认隐藏路径的只读 `prov-sync-unresolved` 检查未解析
-事件。出现 `agent-fill` 时，它只通过 `prov-sync-pending` 读取白名单化的已净化 scaffold，
+退休。canonical 项目 Skill（目录为兼容旧版本保留 `scriptorium-research` 名称）通过
+默认隐藏路径的只读 `prov-sync-unresolved` 检查未解析事件。出现 `agent-fill` 时，它只通过
+`prov-sync-pending` 读取白名单化的已净化 scaffold，
 并只通过 `prov-sync-fill` 提交用户批准的候选 fill；不会拼接受保护路径或直接写
 `fill.json`。提交 fill 与后续执行权威 `--run` 需要分别授权。
 
 退出码 `0` 包括成功预览/执行和正常的 `action-required` 待办；`1` 表示安全阻断或部分
 阶段失败；`2` 表示入口无法形成可信报告。pull 报告按设计只包含聚合信息：组件原始输出、
-本地路径、会话标识和科研正文都会在入口边界被抑制。
+本地路径、会话标识和项目正文都会在入口边界被抑制。
 
 ## 就绪度诊断
 
@@ -377,8 +431,8 @@ scriptorium doctor --json `
 扩展缺失，只会降级对应能力。Agent 登录、浏览器扩展权限、GUI 启动、workspace 写入
 与真实网络行为均明确标为未测试。检测到应用或命令，不等于对应 live integration、
 provider 或真实产出已经验证。Public Alpha 的 workspace 证据至少要求一个带完整
-`project/1.x` frontmatter 的 `Projects/*.md` 笔记；普通仓库 README 不会被误判为科研
-workspace。`entry.pull` 只有在兼容的机器可读能力探针通过时才通过。Public Alpha
+`project/1.x` frontmatter 的 `Projects/*.md` 笔记；普通仓库 README 不会被误判为
+Scriptorium workspace。`entry.pull` 只有在兼容的机器可读能力探针通过时才通过。Public Alpha
 还要求兼容的 `prov-ingest-research` 与 `prov-context` 命令，并探测真实 Context Capsule
 运行时版本。Codex 是当前第一条
 可执行会话捕获路径；仅安装 Claude 的配置在其 opt-in `SessionEnd` hook 完成 live 验证前，
@@ -413,7 +467,7 @@ status 输出。
 scriptorium-demo/
 ├── fixtures/                         # 明确标注的合成输入
 ├── workspace/
-│   ├── Projects/                     # project/1.0 Markdown
+│   ├── Projects/                     # project/1.x Markdown
 │   ├── Reviews/                      # Steward 组装的综述
 │   └── Reports/                      # Provenance 检索与 MCP 证据
 ├── provenance/
@@ -439,9 +493,8 @@ scriptorium-demo/
 ## 紧邻的产品增量
 
 1. 在全新的远端 Windows CI 与隔离用户环境中复跑当前迁移、安装生命周期和幻灯片交接门禁后，再升级其发布状态；
-2. 将已批准的 `experiment-run/1.0` 契约接入本地运行登记、持久化和查询，保留失败运行，但不把计算引擎内置进套件；
-3. 将 `claim-evidence/1.0` 接入验证、人工审阅，以及运行证据与候选 Claim 的显式关联；
-4. 验证 Lectern 真实 provider 输出，以及 Claude Code `SessionEnd` 与 Codex 捕获路径的实时对等性；
-5. 开展外部用户 Alpha，用实测结果决定安装打包与兼容版本范围。
+2. 提交稳定 Spec 与 Provenance 候选，把最终提交号回填到组件目录，再按这些精确版本复跑干净安装；
+3. 用同一合成项目验证真实 Codex 与 Claude Code 会话；
+4. 开展外部用户 Alpha，用实测结果决定安装打包与兼容版本范围。
 
 Apache-2.0，无遥测。

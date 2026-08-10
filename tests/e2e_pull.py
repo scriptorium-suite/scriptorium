@@ -142,7 +142,9 @@ def human_regions(note_bytes: bytes) -> tuple[bytes, bytes]:
     return body[:begin], body[end + len(END_MARKER.encode("utf-8")) :]
 
 
-def isolated_environment(base: Path) -> tuple[dict[str, str], Path]:
+def isolated_environment(
+    base: Path, *, spec_root: Path | None = None
+) -> tuple[dict[str, str], Path]:
     profile = base / "profile"
     appdata = profile / "AppData" / "Roaming"
     localappdata = profile / "AppData" / "Local"
@@ -197,6 +199,8 @@ def isolated_environment(base: Path) -> tuple[dict[str, str], Path]:
         }
     )
     env["PATH"] = str(fake_bin) + os.pathsep + env.get("PATH", "")
+    if spec_root is not None:
+        env["SCRIPTORIUM_SPEC_ROOT"] = str(spec_root)
     return env, profile
 
 
@@ -408,6 +412,7 @@ def init_arguments(
     linked_repo: Path | None,
     run: bool,
     idea: str | None = None,
+    template: str = "software",
 ) -> list[str]:
     arguments = [
         "init",
@@ -421,6 +426,8 @@ def init_arguments(
         title,
         "--host",
         host,
+        "--template",
+        template,
         "--json",
     ]
     if linked_repo is not None:
@@ -464,7 +471,7 @@ def write_rollout(
             "timestamp": now.isoformat(),
             "payload": {
                 "type": "user_message",
-                "message": "Validate the synthetic research capture loop.",
+                "message": "Validate the synthetic long-running project capture loop.",
             },
         },
         {
@@ -520,12 +527,14 @@ def submit_fill(
     require(report.get("status") == "accepted", "Public fill command refused the fill")
 
 
-def run_unresolved_gate_e2e(provenance_root: Path) -> None:
+def run_unresolved_gate_e2e(
+    provenance_root: Path, *, spec_root: Path | None = None
+) -> None:
     with tempfile.TemporaryDirectory(
         prefix="scriptorium-unresolved-e2e-"
     ) as temporary:
         base = Path(temporary)
-        env, profile = isolated_environment(base)
+        env, profile = isolated_environment(base, spec_root=spec_root)
         workspace = base / "workspace"
         provenance_home = base / "provenance-home"
         workspace.mkdir()
@@ -727,7 +736,7 @@ def run_unresolved_gate_e2e(provenance_root: Path) -> None:
         )
 
 
-def run_e2e(provenance_root: Path) -> None:
+def run_e2e(provenance_root: Path, *, spec_root: Path | None = None) -> None:
     provenance_root = provenance_root.expanduser().resolve()
     require(
         (provenance_root / "pyproject.toml").is_file(),
@@ -736,7 +745,7 @@ def run_e2e(provenance_root: Path) -> None:
 
     with tempfile.TemporaryDirectory(prefix="scriptorium-pull-e2e-") as temporary:
         base = Path(temporary)
-        env, profile = isolated_environment(base)
+        env, profile = isolated_environment(base, spec_root=spec_root)
         workspace = base / "workspace"
         provenance_home = base / "provenance-home"
         agent_cwd = workspace
@@ -781,7 +790,7 @@ def run_e2e(provenance_root: Path) -> None:
         )
         require(
             initialized.get("status") == "initialized",
-            "Public init did not initialize the research project",
+            "Public init did not initialize the software project",
         )
         project_note = workspace / "Projects" / "alpha.md"
         config_path = (
@@ -842,6 +851,31 @@ def run_e2e(provenance_root: Path) -> None:
             env=env,
         )
         require(host_report.get("operation") == "host.install", "Host install envelope changed")
+        claude_host_report = invoke_json(
+            [
+                "host",
+                "install",
+                "claude-code",
+                "--json",
+            ],
+            env=env,
+        )
+        require(
+            claude_host_report.get("operation") == "host.install",
+            "Claude Code host install envelope changed",
+        )
+        codex_skill = workspace / ".agents" / "skills" / "scriptorium-research" / "SKILL.md"
+        claude_skill = workspace / ".claude" / "skills" / "scriptorium-research" / "SKILL.md"
+        require(codex_skill.is_file(), "Codex project adapter was not installed")
+        require(claude_skill.is_file(), "Claude Code project adapter was not installed")
+        require(
+            codex_skill.read_bytes() == claude_skill.read_bytes(),
+            "Agent adapters do not expose the same project workflow",
+        )
+        require(
+            b"scriptorium resume" in codex_skill.read_bytes(),
+            "Installed Agent adapters do not expose project resume",
+        )
 
         doctor = invoke_json(
             [
@@ -1065,6 +1099,19 @@ def run_e2e(provenance_root: Path) -> None:
             label="First resume capsule",
             forbidden=report_private_values,
         )
+        alternate_agent_resume = invoke_json(
+            resume_arguments(provenance_root=provenance_root),
+            env=env,
+        )
+        require(
+            alternate_agent_resume.get("capsule") == first_resume.get("capsule"),
+            "Fresh Agent processes did not recover the same project context",
+        )
+        require_private_values_absent(
+            alternate_agent_resume,
+            label="Alternate Agent resume capsule",
+            forbidden=report_private_values,
+        )
 
         approvals_after_approval = approvals_path.read_bytes()
         final = invoke_json(
@@ -1227,19 +1274,27 @@ def build_parser() -> argparse.ArgumentParser:
         default=DEFAULT_PROVENANCE_ROOT,
         help="Provenance source checkout (default: sibling ../Provenance)",
     )
+    parser.add_argument(
+        "--spec-root",
+        type=Path,
+        help="explicit Scriptorium Spec checkout used by child commands",
+    )
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
-        run_unresolved_gate_e2e(args.provenance_root.expanduser().resolve())
-        run_e2e(args.provenance_root)
+        spec_root = args.spec_root.expanduser().resolve() if args.spec_root else None
+        run_unresolved_gate_e2e(
+            args.provenance_root.expanduser().resolve(), spec_root=spec_root
+        )
+        run_e2e(args.provenance_root, spec_root=spec_root)
     except E2EFailure as exc:
         print(f"FAIL: {exc}", file=sys.stderr)
         return 1
     print(
-        "PASS: init, config fallback, doctor, status, unresolved gate, pull, approval, and idempotency loop"
+        "PASS: software init, Codex/Claude adapters, context recovery, status, pull, approval, and idempotency loop"
     )
     return 0
 

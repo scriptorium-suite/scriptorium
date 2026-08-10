@@ -1,25 +1,24 @@
 # Scriptorium 架构、使用与分层验收说明
 
-> 文档状态：开发验收说明，依据 2026-07-23 的公开代码工作区编写。
+> 文档状态：稳定核心候选版验收说明，依据 2026-08-10 的隔离工作树编写。
 >
-> 当前已发布的 umbrella 基线仍是 Public Alpha v0.1.0；工作树正在形成 V0.2.0 候选版。本文中的 V0.2、V0.3、V0.4 是分层验收目标，不等同于已经发布。
+> 当前工作树尚未提交或推送，不等同于已经发布。实验运行与论断—证据晋升保留在开发分支，不阻挡稳定核心收口。
 
 ## 1. 一句话理解这个产品
 
-**Scriptorium 是本地优先、模型中立的科研项目控制层。它连接研究者、AI Agent、文献工具和计算执行器，把研究问题、会话、实验、证据和交付物沉淀为可恢复、可审查、可追溯的项目状态。**
+**Scriptorium 是本地优先、模型中立的长期项目控制层。它连接使用者、AI Agent、本地资料和可选专业工具，把项目目标、会话、决定、进展和交付物沉淀为可恢复、可审查、可追溯的项目状态。**
 
-通俗地说，它不是替研究者自动“做完科研”，也不是另一个聊天机器人。它负责让科研过程不断线：
+通俗地说，它不是替用户自动“做完项目”，也不是另一个聊天机器人。它负责让长期工作不断线：
 
 - 新一轮 AI 协作能知道项目做到哪里；
-- 文献、会话、判断和交付物能找到来源；
-- AI 建议与研究者已经确认的结论不会混在一起；
+- 资料、会话、判断和交付物能找到来源；
+- AI 建议与用户已经确认的决定不会混在一起；
 - 关键写入先预览、再确认，必要时可以回滚；
 - Codex、Claude Code 或其他 Agent 可以更换，项目状态仍留在本地文件和版本化契约中。
 
-“实验进入项目状态”是产品方向。`experiment-run/1.0` 与 `claim-evidence/1.0`
-已经作为正式文件契约存在，但当前还没有运行登记命令、持久化与查询路径、结果与 Claim
-的关联，也没有统一执行器接口。现阶段实验仍由用户在 Jupyter、Python 或领域软件中运行，
-再把经过审阅的结果接回项目。
+稳定核心覆盖通用、工程、软件与科研四类模板，共用同一套项目身份、会话收尾、人工审批
+和上下文恢复机制。实验运行、论断—证据审核与执行器接线属于增强方向，继续在开发分支
+验证，不进入本轮稳定发布口径。
 
 ## 2. 各组件分别做什么
 
@@ -27,10 +26,10 @@
 |---|---|---|
 | **Scriptorium（umbrella）** | 统一入口；初始化项目；检查环境；盘点显式选中的资料；触发会话同步；读取恢复上下文；安装项目级 Agent Skill | 不直接拥有 Zotero、记忆库或 PPT 编译器；不在后台偷偷运行 |
 | **scriptorium-spec** | 定义各组件交换的 JSON Schema 和约定，是跨仓库数据契约的唯一事实来源 | 没有运行时产品，也不保存用户研究数据 |
-| **Steward** | 管理文献资料；导出文献 KB；解析论文；生成阅读、脉络、综述和 `handoff/1.x` 交接包 | 不替用户确认科学结论；不作为项目记忆所有者 |
-| **Provenance** | 保存会话、项目状态、审批候选、文献研究产物和检索索引；生成有边界的 Context Capsule | 不替 Agent 做开放式推理；不会把 `reference_only` 资料自动升级为正式结论 |
-| **外部 Agent** | 阅读项目上下文，辅助梳理问题、查文献、设计分析、填写待审候选 | 不是项目事实的最终裁决者 |
-| **外部计算执行器** | 运行 Python、Jupyter、领域软件或其他可验证实验 | 当前尚未通过统一的 Scriptorium 实验账本接线 |
+| **Steward** | 可选科研扩展；管理文献资料、阅读产物与 `handoff/1.x` 交接包 | 不作为通用项目核心依赖；不替用户确认科学结论 |
+| **Provenance** | 保存会话、项目状态、审批候选和检索索引；生成有边界的 Context Capsule | 不替 Agent 做开放式推理；不会把 Agent 建议自动升级为正式决定 |
+| **外部 Agent** | 阅读项目上下文，辅助梳理问题、资料、分析和待审候选 | 不是项目事实的最终裁决者 |
+| **外部专业工具** | 运行代码、计算、文献或领域工作 | 稳定核心不强制接管其执行过程 |
 | **Lectern** | 消费论文或 `handoff/1.x`，先生成可审阅提纲，再编译为可编辑 `.pptx` | 离线跨仓验收使用 `FakeLLM`，不等同于真实 provider、真实论文或 PowerPoint 人工 UAT |
 
 Obsidian、Zotero 和 PowerPoint 是可选应用。核心交换面是本地 Markdown 与版本化 JSON；没有这些应用时，项目仍应能够以文件方式工作，只是体验会降级。
@@ -39,15 +38,15 @@ Obsidian、Zotero 和 PowerPoint 是可选应用。核心交换面是本地 Mark
 
 ```mermaid
 flowchart TD
-    U["研究者：目标、审批、科学判断"] --> S["Scriptorium 统一入口"]
+    U["使用者：目标、审批、最终判断"] --> S["Scriptorium 统一入口"]
     A["Codex / Claude Code / 其他 Agent"] <--> S
     S <--> W["本地 Markdown 工作区"]
     S <--> P["Provenance：会话、项目状态、候选审批、Context Capsule"]
-    S <--> T["Steward：文献 KB、解析、阅读、综述、handoff"]
+    S -. "research profile" .-> T["Steward：文献 KB、解析、阅读、综述、handoff"]
     T --> C["scriptorium-spec：版本化文件契约"]
     P --> C
     W --> C
-    E["Jupyter / Python / 领域计算工具"] -. "当前由用户显式运行并人工接回" .-> W
+    E["代码 / Jupyter / 工程与领域工具"] -. "由用户显式运行并按需接回" .-> W
     T --> H["handoff/1.x"]
     H --> L["Lectern：提纲审阅 -> 可编辑 PPTX"]
 ```
@@ -64,7 +63,23 @@ flowchart TD
 
 ## 4. 整体怎么使用
 
-### 4.0 先跑公开 synthetic golden flow
+### 4.0 先选择安装组合
+
+`core` 只包含 Spec 与 Provenance；`research` 在核心上增加 Steward；`slides` 增加
+Lectern；`capture` 只安装经过校验的浏览器扩展 ZIP，不克隆 Provenance。所有安装默认
+只预览：
+
+```powershell
+scriptorium components --profile core --json
+scriptorium install core --target D:\Scriptorium\components --json
+scriptorium install core --target D:\Scriptorium\components --run --json
+. D:\Scriptorium\components\scriptorium-env.ps1
+```
+
+各组件仍保留自己的仓库和命令。统一入口负责给普通用户提供固定版本组合，并不把组件
+合并成一个必须整体下载的单体仓库。
+
+### 4.0.1 再跑公开 synthetic golden flow
 
 在接触真实资料前，先用仓库自带的完全合成数据检查组件接线：
 
@@ -101,15 +116,22 @@ scriptorium init `
   --project-id <project-id> `
   --title "<title>" `
   --host codex `
-  --idea "<research-intuition>" `
+  --template software `
+  --context "<current-project-context>" `
   --json
 ```
 
-确认工作区、数据根目录、项目标识和初始研究直觉都正确后，才增加 `--run`。初始化会建立最小 Markdown 工作区和套件配置，不会自动读取 Zotero、模型密钥或整台电脑。
+确认工作区、数据根目录、项目标识、项目模板和初始上下文都正确后，才增加 `--run`。
+初始化会建立最小 Markdown 工作区和套件配置，不会自动读取 Zotero、模型密钥或整台电脑。
 
 ### 4.2 盘点已有资料
 
 `inventory` 只扫描用户明确给出的 Markdown、PDF、会话导出或 Zotero 导出位置，并输出聚合预览：
+
+通用项目采用分流接入：已有代码或工程仓库通过 `init --linked-repo` 登记，原仓库继续
+作为权威来源；需要放入 Markdown 工作区的资料只复制用户显式选中的 Markdown/PDF；
+Agent 日志和 Capture 导出交给 Provenance；Zotero 与文献资料交给可选的 Steward。
+登记仓库不会触发整仓复制、秘密扫描或自动索引。
 
 ```powershell
 scriptorium inventory --source <selected-file-or-directory> --json
@@ -117,10 +139,10 @@ scriptorium inventory --source <selected-file-or-directory> --json
 
 它当前是**零写入盘点边界**：不复制、不解析、不索引、不迁移。报告用于回答“有多少资料、可以路由到哪里、哪些类型暂不支持”，而不是展示私人正文。
 
-### 4.3 迁移资料：V0.3 候选流程
+### 4.3 迁移资料：稳定核心文档复制流程
 
-Markdown/PDF 迁移引擎已经接入公开 `scriptorium migrate` CLI，但仍定位为
-**V0.3 candidate**，不代表 V0.3 整体已经验收。入口只接受用户显式给出的来源，
+Markdown/PDF 迁移引擎已经接入公开 `scriptorium migrate` CLI，并纳入本轮稳定核心
+候选。入口只接受用户显式给出的来源，
 默认不联网、不调用模型、不解析正文，也不会把副本自动升级为 Provenance 事实。
 
 ```powershell
@@ -222,10 +244,9 @@ scriptorium pull --project <project-id> --run --json
 4. 对关键数字做独立复算；
 5. 由研究者审阅后，把结论、限制和下一步写回项目。
 
-**尚未完成：**对 `experiment-run/1.0` 的运行登记、持久化和查询，对
-`claim-evidence/1.0` 的人工审阅与 Claim 关联，以及失败实验的可检索经验库。两个 Schema
-只定义跨组件交换形状；因此“脚本成功退出”目前不能被 Scriptorium 自动解释为
-“科学结论成立”。
+稳定核心没有实验账本或论断—证据晋升承诺；“脚本成功退出”不能被 Scriptorium 自动
+解释为“结论成立”。相关原型与设计保存在开发分支，等核心产品获得真实使用反馈后再决定
+是否进入后续稳定版本。
 
 ### 4.7 生成汇报 PPT
 
@@ -250,71 +271,65 @@ lectern build --from-outline outline.json --out deck.pptx
 
 ### 5.1 V0.2：证明“下一次协作接得上”
 
-目标是把文献研究产物、两轮会话和项目状态接入同一个可恢复闭环。
+目标是让通用、工程、软件和科研项目都能把显式资料、两轮会话和项目状态接入同一个
+可恢复闭环；科研产物作为要求更高的旗舰集成样例。
 
 公开 synthetic 验收至少应满足：
 
-1. `init` 预览零写入，执行后再次运行保持幂等；
-2. `doctor` 能识别精确兼容的 Spec、Steward 和 Provenance；
-3. 两轮合成 Agent 会话经过 `pull`、项目解析、候选填充和人工审批边界；
-4. 第二轮 `resume` 能看到两轮已经接受的进展，而不是原始私聊全文；
-5. 四类合成研究产物——`parsed-paper`、`reading-note`、`review`、`lineage-graph`——通过 Schema 验证并导入；
-6. 相同产物逆序重复导入后，新增数为零且存储字节稳定；
+1. `init` 支持四类模板，预览零写入，执行后再次运行保持幂等；
+2. `linked-repo` 只登记现有仓库；`inventory` 零写入；`migrate` 只复制显式选择的 Markdown/PDF，并可验证和回滚；
+3. `doctor` 能识别精确兼容的 Spec、Steward 和 Provenance；
+4. 两轮合成 Agent 会话经过 `pull`、项目解析、候选填充和人工审批边界；
+5. 第二轮 `resume` 能看到已经接受的进展，而不是原始私聊全文；
+6. 四类合成研究产物通过 Schema 验证并导入，逆序重复导入后新增数为零且存储字节稳定；
 7. Context Capsule 有固定大小上限，不含本地路径，研究产物均为 `reference_only`；
 8. 未解析项目不生成 `session-summary/1.0`；
 9. 测试输出和公开 artifact 通过邮箱、凭据、绝对路径与私人关键词扫描；
 10. Windows 为阻断平台，Ubuntu 至少保持回归通过。
 
-当前判断：V0.2 的 `resume`、研究产物导入、合成 demo 扩展和双会话 E2E 已通过本地
+当前判断：V0.2 的四类模板、显式文档迁移、`resume`、研究产物导入、合成 demo 扩展和双会话 E2E 已通过本地
 自动化验证；它们还未形成正式 V0.2 发布。远端 Windows 与 Ubuntu CI、干净 diff、最终
 版本提交和 release tag 仍是发布结论的必要证据。
 
-### 5.2 V0.3：证明“资料、实验和交付物走得通”
+### 5.2 开发分支：保存增强能力，不阻挡核心发布
 
-V0.3 应在 V0.2 基础上新增三条可验收能力：
+开发分支保留两类已经投入过的增强探索：
 
-1. **安全迁移**
-   - `inventory -> plan -> apply -> verify -> rollback` 有公开 CLI；
-   - 只接受显式选中的 Markdown/PDF；
-   - 不覆盖、不跟随链接、哈希一致、重复执行幂等；
-   - 私有路径只存在本机 manifest，公开报告只含计数和状态。
-2. **最小实验账本**
-   - 有经过批准的版本化契约；
+1. **最小实验账本与论断证据**
+   - 契约和晋升机制仍处于开发状态，不属于稳定核心；
    - 能记录运行身份、代码版本、输入、参数、环境、状态、指标和产物哈希；
    - 失败运行也保留；
    - “运行完成”与“结论被证据支持”是两个独立状态。
-3. **汇报交付闭环**
+2. **汇报交付闭环**
    - Steward 生成合法 `handoff/1.x`；
    - Lectern 生成提纲并停在人工审批；
    - 批准后生成可打开、可编辑的 `.pptx`；
    - 每个关键结论能回到来源或明确标为推测。
 
-当前判断：安全迁移 CLI 与 Lectern 跨仓合成 E2E 已在开发工作区通过；
-`experiment-run/1.0` 与 `claim-evidence/1.0` 正式契约也已存在，但 umbrella 与
-Provenance 尚未接入运行登记、持久化、查询和 Claim 关联，远端 Windows CI 也还没有运行。
-因此 V0.3 目前仍不能整体验收通过。
+当前判断：这些内容可以继续作为正在推进的开发线保存，但不进入稳定组件目录、快速开始
+路径或发布完成度。稳定版是否吸收它们，取决于核心产品的真实使用反馈。
 
-### 5.3 V0.4：证明“别人能在 Windows 上独立用起来”
+### 5.3 稳定核心发布：证明“别人能在 Windows 上独立用起来”
 
-V0.4 是面向外部 Alpha 的产品验收，而不只是开发者测试：
+稳定核心的产品验收不是只看单仓测试：
 
 1. 一台干净 Windows 环境能按文档完成安装、升级和卸载；
 2. Codex 与 Claude Code 各完成至少一轮真实但隔离的会话恢复与收尾；
 3. Zotero、Obsidian、PowerPoint、Lectern 缺失时给出明确降级，不破坏 Markdown 核心路径；
-4. 可选组件存在时，能完成文献接入和 PPT 交付；
+4. 用户可以选择 research 扩展或只安装 Capture；Provenance 与 Steward 可独立运行；
 5. 所有默认动作本地优先、预览优先、无后台常驻、无隐式网络；
 6. 至少一名未参与开发的目标用户，在不依赖开发者代操作的情况下完成：
    - 建立或迁入一个项目；
    - 恢复上下文；
-   - 完成一轮有证据的研究推进；
+   - 完成一轮项目推进；
    - 关闭会话并在下一轮恢复；
-   - 导出一个可审阅交付物；
+   - 看到一份可审阅的项目状态；
 7. 记录任务完成率、首次成功耗时、阻塞点、误操作和用户是否理解审批边界；
 8. 发布包、CI artifact、截图和文档经过隐私与凭据扫描。
 
-当前判断：本地隔离环境中的安装、卸载、重装和 v0.1.0 到 v0.2.0 的版本切换已经通过；
-全新远端或独立干净 Windows 环境、真实双 Agent 对等验证和外部用户 Alpha 仍未完成，
-因此 V0.4 不能宣称完成。
+当前判断：本地 Windows 已通过 wheel 干净安装、卸载、重装、core/research/Capture-only
+选择安装、独立组件启动和双适配器合成恢复。最终提交号回填、远端 CI、真实双 Agent 登录
+与外部用户 Alpha 仍未完成，因此当前仍是候选版而不是已发布产品。
 
 ## 6. 验收数据如何分级
 

@@ -1,4 +1,4 @@
-"""Safe, no-clobber initialization for a Scriptorium research workspace."""
+"""Safe, no-clobber initialization for a Scriptorium project workspace."""
 
 from __future__ import annotations
 
@@ -29,6 +29,7 @@ from .host import HOSTS
 PROJECT_ID_RE = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
 PROJECT_SCHEMA_RE = re.compile(r"project/1\.[0-9]+")
 PROJECT_STATUSES = {"planned", "active", "paused", "done", "archived"}
+PROJECT_TEMPLATES = ("general", "research", "engineering", "software")
 _YAML_IMPLICIT = {
     "null", "~", "true", "false", "yes", "no", "on", "off",
     ".nan", ".inf", "+.inf", "-.inf",
@@ -92,6 +93,14 @@ def _resolve_managed_root(path: Path, *, label: str) -> Path:
     _check_existing_components(requested, label=label)
     if requested.exists() and not requested.is_dir():
         raise InitError(f"{label} is not a directory")
+    if requested == Path(requested.anchor):
+        raise InitError(f"{label} cannot be a filesystem root")
+    try:
+        user_home = Path.home().resolve(strict=False)
+    except (OSError, RuntimeError):
+        user_home = None
+    if user_home is not None and requested.resolve(strict=False) == user_home:
+        raise InitError(f"{label} cannot be the user home directory")
     return requested
 
 
@@ -142,7 +151,9 @@ def _canonical_hosts(hosts: list[str]) -> tuple[str, ...]:
     return tuple(sorted(set(hosts)))
 
 
-def _validate_text(project_id: str, title: str, idea: str | None) -> None:
+def _validate_text(
+    project_id: str, title: str, idea: str | None, template: str
+) -> None:
     if not isinstance(project_id, str) or not PROJECT_ID_RE.fullmatch(project_id):
         raise InitError("project id must be a non-empty kebab-case identifier")
     if (
@@ -155,12 +166,14 @@ def _validate_text(project_id: str, title: str, idea: str | None) -> None:
         raise InitError("project title must be non-empty and single-line")
     if PROGRESS_BEGIN in title or PROGRESS_END in title:
         raise InitError("project title cannot contain managed progress-log markers")
+    if template not in PROJECT_TEMPLATES:
+        raise InitError("project template is not supported")
     if idea is not None and not isinstance(idea, str):
-        raise InitError("research idea must be text")
+        raise InitError("initial project context must be text")
     if idea is not None and "\x00" in idea:
-        raise InitError("research idea cannot contain NUL bytes")
+        raise InitError("initial project context cannot contain NUL bytes")
     if idea is not None and (PROGRESS_BEGIN in idea or PROGRESS_END in idea):
-        raise InitError("research idea cannot contain managed progress-log markers")
+        raise InitError("initial project context cannot contain managed progress-log markers")
 
 
 def _yaml_string(value: str) -> str:
@@ -173,19 +186,49 @@ def _project_payload(
     title: str,
     linked_repo: Path | None,
     idea: str | None,
+    template: str,
     updated: date,
 ) -> bytes:
     repo = str(linked_repo).replace("\\", "/")
     normalized_idea = idea.replace("\r\n", "\n").replace("\r", "\n") if idea else ""
-    intuition = (
+    initial_context = (
         normalized_idea.strip()
         if normalized_idea.strip()
-        else "<!-- Capture the initial research intuition here. -->"
+        else "<!-- Capture the initial project context here. -->"
+    )
+    sections = {
+        "general": (
+            ("Overview", initial_context),
+            ("Goal and scope", "<!-- Define the desired outcome and boundaries. -->"),
+            ("Source material", "<!-- Link the authoritative files and references. -->"),
+            ("Decisions", "<!-- Record reviewed decisions and their rationale. -->"),
+        ),
+        "research": (
+            ("Research intuition", initial_context),
+            ("Research question", "<!-- Define the research question after review. -->"),
+            ("Evidence and literature", "<!-- Add source-backed evidence and literature here. -->"),
+        ),
+        "engineering": (
+            ("System context", initial_context),
+            ("Current objective or issue", "<!-- Describe the bounded engineering objective. -->"),
+            ("Constraints and risks", "<!-- Record operational constraints and known risks. -->"),
+            ("Decisions", "<!-- Record reviewed architecture and maintenance decisions. -->"),
+        ),
+        "software": (
+            ("Product intent", initial_context),
+            ("Requirements", "<!-- Record reviewed user needs and acceptance conditions. -->"),
+            ("Design decisions", "<!-- Record important product and technical trade-offs. -->"),
+            ("Current implementation", "<!-- Summarize the current working state. -->"),
+        ),
+    }
+    section_text = "\n\n".join(
+        f"## {heading}\n\n{body}" for heading, body in sections[template]
     )
     text = f"""---
-schema_version: project/1.0
+schema_version: project/1.1
 project_id: {_yaml_string(project_id)}
 title: {_yaml_string(title)}
+profile: {_yaml_string(template)}
 status: planned
 stage: ""
 next_actions: []
@@ -198,17 +241,7 @@ updated: {_yaml_string(updated.isoformat())}
 
 # {title}
 
-## Research intuition
-
-{intuition}
-
-## Research question
-
-<!-- Define the research question after review. -->
-
-## Evidence and literature
-
-<!-- Add source-backed evidence and literature here. -->
+{section_text}
 
 ## Next actions
 
@@ -1453,12 +1486,13 @@ def run_init(
     hosts: list[str],
     linked_repo: Path | None = None,
     idea: str | None = None,
+    template: str = "research",
     config_dir: Path | None = None,
     run: bool = False,
     today: date | None = None,
 ) -> dict[str, Any]:
     """Plan or create the minimal local-first Scriptorium project structure."""
-    _validate_text(project_id, title, idea)
+    _validate_text(project_id, title, idea, template)
     if today is not None and not isinstance(today, date):
         raise InitError("today must be a date")
     canonical_hosts = _canonical_hosts(hosts)
@@ -1497,6 +1531,7 @@ def run_init(
         title=title,
         linked_repo=resolved_repo or resolved_workspace,
         idea=idea,
+        template=template,
         updated=today or date.today(),
     )
     try:

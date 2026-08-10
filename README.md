@@ -8,33 +8,101 @@
 > and explicit project-scoped Codex and Claude Code skill installers. It also ships
 > the accepted on-demand `scriptorium pull` entry and bounded, read-only
 > `scriptorium resume` Context Capsule through Provenance's machine-readable
-> public commands. A safety-reviewed `scriptorium migrate` CLI is included as a
-> V0.3 candidate, not as a completed V0.3 release. The previously published baseline
-> has GitHub-hosted Windows evidence; this worktree also has local synthetic migration,
-> install/uninstall/reinstall, v0.1.0-to-current version-transition, and
-> Steward-to-Lectern checks, but still needs fresh remote CI.
-> Live Agent-host parity and real-provider slide generation remain manual Alpha gates.
+> public commands. A safety-reviewed `scriptorium migrate` boundary copies only
+> explicitly selected Markdown/PDF files as part of this stable-core candidate. The previously published baseline
+> has GitHub-hosted Windows evidence; this worktree also has local core, research-profile,
+> and Capture-only installation evidence plus a synthetic software-project recovery check
+> through both Codex and Claude Code workspace adapters. Fresh remote CI, live model login,
+> and real-provider slide generation remain release gates.
 
-Scriptorium is a local-first, agent-native research workflow suite. This repository
-is its thin control plane: it coordinates independently useful components through
-public commands and versioned files without importing their internals or owning
-their research data.
+Scriptorium is a local-first, model-neutral project context and continuity suite for
+long-running work. This repository is its thin product entry point: it coordinates
+independently useful components through public commands and versioned files without
+importing their internals or taking ownership of the user's project data. Research is
+the flagship reference workflow, not the product boundary; the same core also supports
+engineering maintenance and personal software projects.
 
 [中文说明](README.zh.md) · [架构、使用与分层验收](docs/architecture-and-acceptance.zh-CN.md) · [中文产品案例](docs/case-study.zh-CN.md) · [Showcase evidence](docs/showcase/README.zh-CN.md) · [Contract source of truth](https://github.com/scriptorium-suite/scriptorium-spec) · [Design inspirations](ACKNOWLEDGEMENTS.md)
 
 ![Scriptorium Public Alpha synthetic golden-path evidence](docs/showcase/demo-poster.svg)
 
+## Product profiles and independent components
+
+`scriptorium components --profile <name>` shows the pinned, machine-readable component
+set for `core`, `research`, `slides`, `full`, or `capture`. `core` contains the shared
+Spec contracts and Provenance context engine; `research` adds Steward; `slides` adds
+Lectern. Each product keeps its own repository and public CLI.
+
+`scriptorium install <profile> --target <directory>` is a zero-write preview. Add
+`--run` only after reviewing the exact repositories, versions, commit IDs, destinations,
+and network action. The installer refuses non-empty unowned targets and never deletes a
+partial checkout after failure; it leaves a local ownership marker for inspection.
+
+Capture is not a separate repository. It remains the optional `01-capture` browser
+exporter owned by Provenance, while its deterministic ZIP is designed to be attached to
+a tagged Provenance Release for users who need only conversation export. Until that
+asset is actually published, the `capture` profile reports `action-required` and refuses
+to pretend that an independent download is available.
+
+The stable-core candidate deliberately stops at project intake, session closeout,
+human approval, and context recovery. Experimental run/evidence promotion work remains
+on development branches and is not included in the component catalog or stable-core
+acceptance claim.
+
+## Short Windows path
+
+After cloning this entry repository and running `uv sync --locked`, inspect the exact
+component plan before allowing any network or filesystem writes:
+
+```powershell
+uv run scriptorium components --profile core
+uv run scriptorium install core --target D:\Scriptorium\components
+uv run scriptorium install core --target D:\Scriptorium\components --run
+. D:\Scriptorium\components\scriptorium-env.ps1
+
+uv run scriptorium init `
+  --workspace D:\Projects\my-project `
+  --provenance-home D:\Projects\my-project-memory `
+  --project-id my-project `
+  --title "My long-running project" `
+  --template software `
+  --host codex `
+  --run
+uv run scriptorium host install codex
+
+# After completing one Agent session in this workspace:
+uv run scriptorium pull --project my-project --json
+uv run scriptorium pull --project my-project --run --json
+# Complete any reported Agent fill or Approvals.md review, then pull again.
+uv run scriptorium resume --project my-project
+```
+
+Use the `research` profile to add Steward. Use `capture` with a verified local Release
+ZIP when only the browser exporter is needed; it does not clone Provenance. Components
+remain independently runnable from their own repositories.
+
 ## What works now
 
-`scriptorium init` previews or creates the minimal structure for a real research
-project: the suite config, separate Markdown workspace and Provenance data-root
-directories, and one valid `project/1.0` note. Preview is the default and `--run`
+`scriptorium init` previews or creates the minimal structure for a real project:
+the suite config, separate Markdown workspace and Provenance data-root
+directories, and one valid `project/1.1` note (`project/1.0` remains readable). Preview is the default and `--run`
 is required to write. Existing files are never rewritten. Selecting a host records
 that choice in config; it does not install the host adapter, a model, or a hook, and
 init does not request network access or read provider credentials. After init,
 `host install`, `doctor`, `status`, and `pull` can resolve their workspace/data
 selection from the suite config when higher-precedence CLI flags or environment
 variables are absent.
+
+The CLI defaults to the `general` project template. `--template engineering`,
+`--template software`, and `--template research` provide different human-readable
+project briefs over the same stable project identity and state contract.
+
+Existing work enters through explicit routes instead of one unsafe whole-disk import:
+register an existing code or engineering repository with `init --linked-repo` and keep
+that repository authoritative; inventory and copy only selected Markdown/PDF documents;
+bring local Agent logs or a Capture export through Provenance; and use Steward only when
+Zotero or literature governance is needed. Scriptorium does not copy an entire repository,
+discover personal folders, or ingest credentials merely because a project was linked.
 
 `doctor`, `status`, and `pull` report whether each root came from the CLI,
 environment, suite config, or auto-discovery. `status` and `pull` reports
@@ -95,7 +163,7 @@ checks that the second session can recover the first session's reviewed state.
 the Public Alpha readiness result from `doctor`; only when that boundary is ready
 does it run a `pull` preview. The result contains allowlisted capability states,
 aggregate workflow counts, and fixed review cues only. It does not forward local
-paths, project or session identifiers, research content, component stderr, or raw
+paths, project or session identifiers, project content, component stderr, or raw
 diagnostic details. It never invokes `--run`: `attention` is a normal exit-0
 backlog, while incomplete or blocked readiness returns 1 and an untrustworthy report
 or a trusted pull-preview error returns 2. Neither status nor its preview authorizes
@@ -115,7 +183,7 @@ migration occurred. On Windows, selected objects are held through metadata-only
 bindings for the duration of the preview, so another process cannot rename, delete,
 or open them for data write until the command finishes.
 
-`scriptorium migrate` is the V0.3 candidate copy boundary for explicitly selected
+`scriptorium migrate` is the stable-core copy boundary for explicitly selected
 Markdown/PDF files. `plan` is write-free; first `apply` requires the selected
 sources; later `apply`, `verify`, and `rollback` recover the batch from only its
 workspace and batch identifier. The preview is advisory rather than a persisted
@@ -189,7 +257,7 @@ filenames, research text, hashes, sizes, or timestamps. An incomplete or unsafe 
 fails closed with exit code `1`; malformed invocation or an internal boundary failure
 returns `2` without echoing the sensitive input.
 
-### V0.3 candidate: copy selected Markdown/PDF files safely
+### Copy selected Markdown/PDF files safely
 
 Use a stable batch identifier. Review the aggregate plan first, then repeat the
 same explicit sources for the first apply:
@@ -233,8 +301,8 @@ internal `.scriptorium-*.stage` ownership anchors or `.scriptorium-*.rollback`
 quarantine entries while a batch is active; a successful rollback removes its
 recorded entries. A process crash before a random stage is recorded can leave an
 unclaimed stage for manual inspection; Scriptorium will not guess that it owns or
-delete that path. Keep this candidate on synthetic or isolated copies until its
-full V0.3 acceptance gate is complete.
+delete that path. Start with synthetic or isolated copies, review the aggregate plan,
+and keep the original source authoritative until verification succeeds.
 
 ### Ten-minute path for a real project
 
@@ -391,7 +459,7 @@ scriptorium resume --provenance-home D:\Research\ProvenanceData --project my-pro
 ```
 
 The paths must already exist. Scriptorium never falls back to the current directory
-for research data. A canonical Codex adapter enables the conservative local-log scan
+for project data. A canonical Codex adapter enables the conservative local-log scan
 (registered projects only, recent stable logs, Desktop excluded). A Claude Code skill
 does not imply that its optional `SessionEnd` enqueue hook was installed or live-tested;
 that capture path remains a separate, explicit user configuration. `--project` narrows
@@ -401,8 +469,9 @@ If the report includes `project-resolution`, the affected events remain in prote
 inflight state. Scriptorium will not create a summary, timeline, or draft with an
 unresolved project. Approve or add the correct `project_id` / `linked_repo` mapping in
 the Markdown workspace, then rerun pull; the same events resume without being retired.
-The canonical research skill inspects unresolved items through the read-only, path-
-suppressed `prov-sync-unresolved` entry. When `agent-fill` appears, it reads allowlisted
+The canonical project skill (whose directory keeps the legacy `scriptorium-research`
+name) inspects unresolved items through the read-only, path-suppressed
+`prov-sync-unresolved` entry. When `agent-fill` appears, it reads allowlisted
 sanitized scaffolds through `prov-sync-pending` and submits approved candidate fills only
 through `prov-sync-fill`; it never constructs a protected path or writes `fill.json`
 directly. Fill submission and the later authoritative `--run` require separate approval.
@@ -410,7 +479,7 @@ directly. Fill submission and the later authoritative `--run` require separate a
 Exit `0` includes a successful preview/run and expected `action-required` backlog, `1`
 means a safe block or partial component pass, and `2` means the entry could not form a
 trustworthy report. The pull report is deliberately aggregate-only: raw component output,
-local paths, session identifiers, and research content are suppressed at the entry boundary.
+local paths, session identifiers, and project content are suppressed at the entry boundary.
 
 ## Readiness diagnostics
 
@@ -433,7 +502,7 @@ browser-extension permissions, GUI launch, workspace writes, and live network
 behavior remain explicitly untested. Detecting an application or command is not
 reported as a successful live integration or provider check. Public Alpha workspace
 evidence requires at least one `Projects/*.md` note with complete `project/1.x`
-frontmatter; an arbitrary repository README is not treated as a research workspace.
+frontmatter; an arbitrary repository README is not treated as a Scriptorium workspace.
 `entry.pull` passes only when the compatible machine-readable capability probe succeeds.
 Public Alpha also requires compatible `prov-ingest-research` and `prov-context`
 commands, and probes the actual Context Capsule runtime version.
@@ -471,7 +540,7 @@ parse the legacy human-readable Provenance status output.
 scriptorium-demo/
 ├── fixtures/                         # explicitly synthetic inputs
 ├── workspace/
-│   ├── Projects/                     # project/1.0 Markdown
+│   ├── Projects/                     # project/1.x Markdown
 │   ├── Reviews/                      # Steward-assembled review
 │   └── Reports/                      # Provenance search + MCP evidence
 ├── provenance/
@@ -504,12 +573,10 @@ evidence for safe ranges.
 
 1. run the current migration, install lifecycle, and slide handoff gates on fresh
    remote Windows CI and in an isolated user environment before promotion;
-2. wire the approved `experiment-run/1.0` contract into local run registration,
-   persistence, and query, including failed runs, without embedding a compute engine;
-3. wire `claim-evidence/1.0` into validation, human review, and explicit links
-   between run evidence and candidate claims;
-4. verify real-provider Lectern output and live Claude Code `SessionEnd` parity;
-5. run an external-user Alpha and use the evidence to shape packaging and
+2. commit the stable Spec and Provenance candidates, backfill their final commit IDs
+   into the component catalog, and rerun clean install from those exact revisions;
+3. verify live Codex and Claude Code sessions with the same synthetic project;
+4. run an external-user Alpha and use the evidence to shape packaging and
    compatibility ranges.
 
 Apache-2.0. No telemetry.

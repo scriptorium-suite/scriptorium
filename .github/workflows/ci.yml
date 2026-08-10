@@ -32,7 +32,11 @@ jobs:
       - run: scriptorium status --help
       - run: scriptorium doctor --help
       - run: scriptorium host install --help
+      - run: scriptorium components --profile core --json
+      - run: scriptorium install core --target ./scriptorium-components-preview --json
       - run: python -m unittest discover -s tests -v
+      - name: Run general project intake acceptance
+        run: python tests/e2e_general_intake.py
 
   e2e-windows:
     runs-on: windows-latest
@@ -49,19 +53,19 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           repository: scriptorium-suite/scriptorium-spec
-          ref: 0439e7abe4dd307c8b97afa34f9fc3b45605d3b4
+          ref: 36612e80c49f5a8f346a09ed73f4b1c67cef5135
           path: scriptorium-spec
           persist-credentials: false
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           repository: scriptorium-suite/steward
-          ref: 21e4e454fb97702bc5f31c24b805cf3c9489bc31
+          ref: 7aafad1b432207905072c769fe527a3d4d1b365e
           path: steward
           persist-credentials: false
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           repository: foxsplendid/Provenance
-          ref: 6380bb0a8bfe8129a9edb2f903856a33b59dbcbb
+          ref: 1e3f1c022148c33f257d8a27502b50dbe906611d
           path: Provenance
           persist-credentials: false
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -99,6 +103,7 @@ jobs:
             $report.lifecycle.clean_install -ne "passed" -or
             $report.lifecycle.uninstall -ne "passed" -or
             $report.lifecycle.reinstall -ne "passed" -or
+            $report.lifecycle.standalone_components -ne "passed" -or
             $report.lifecycle.doctor_and_demo -ne "passed" -or
             $report.lifecycle.version_transition.status -ne "passed" -or
             $report.lifecycle.version_transition.previous_version -ne "0.1.0"
@@ -357,7 +362,8 @@ jobs:
         run: |
           & .\.demo-venv\Scripts\python.exe `
             .\scriptorium\tests\e2e_pull.py `
-            --provenance-root .\Provenance
+            --provenance-root .\Provenance `
+            --spec-root .\scriptorium-spec
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - name: Run offline Steward to Lectern golden path
         shell: pwsh

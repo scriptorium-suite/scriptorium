@@ -1,6 +1,6 @@
 """Explicit, local-only Markdown/PDF migration.
 
-Private manifests contain absolute paths and live outside the research
+Private manifests contain absolute paths and live outside the project
 workspace. Public reports contain aggregate counts only.
 
 Threat boundary: this module coordinates cooperative processes for one local
@@ -33,7 +33,7 @@ MANIFEST_PRIVACY = "local-private"
 MIGRATION_LIMITATIONS = (
     "Only explicitly selected Markdown and PDF files or directories are supported.",
     "AI conversations, Zotero libraries, parsing, indexing, and network sources are not supported.",
-    "The private path manifest stays in the local state root outside the research workspace.",
+    "The private path manifest stays in the local state root outside the project workspace.",
     "Coordination assumes one local user and cooperative Scriptorium processes.",
     "Atomic publication requires hard-link support on the local destination filesystem.",
     "Sources may be on another local volume because bytes are staged beside each destination.",

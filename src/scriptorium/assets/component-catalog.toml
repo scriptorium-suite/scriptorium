@@ -1,0 +1,58 @@
+catalog_version = 1
+default_profile = "core"
+
+[profiles]
+core = ["scriptorium-spec", "provenance"]
+research = ["scriptorium-spec", "provenance", "steward"]
+slides = ["scriptorium-spec", "provenance", "lectern"]
+full = ["scriptorium-spec", "provenance", "steward", "lectern"]
+capture = ["capture"]
+
+[components."scriptorium-spec"]
+display_name = "Scriptorium Spec"
+version = "2.3.0"
+repository = "https://github.com/scriptorium-suite/scriptorium-spec.git"
+revision = "36612e80c49f5a8f346a09ed73f4b1c67cef5135"
+stability = "candidate"
+delivery = "source"
+directory = "scriptorium-spec"
+
+[components.provenance]
+display_name = "Provenance"
+version = "0.18.0"
+repository = "https://github.com/foxsplendid/Provenance.git"
+revision = "1e3f1c022148c33f257d8a27502b50dbe906611d"
+stability = "candidate"
+delivery = "python-source"
+directory = "Provenance"
+
+[components.steward]
+display_name = "Steward"
+version = "0.2.0"
+repository = "https://github.com/scriptorium-suite/steward.git"
+revision = "7aafad1b432207905072c769fe527a3d4d1b365e"
+stability = "stable"
+delivery = "python-source"
+directory = "steward"
+
+[components.lectern]
+display_name = "Lectern"
+version = "0.3.0-candidate"
+repository = "https://github.com/foxsplendid/Academic-Slides-Agent.git"
+revision = "6371f1e6eac41f505aed39e58dafb689317cab65"
+stability = "candidate"
+delivery = "workspace-source"
+directory = "Academic-Slides-Agent"
+
+[components.capture]
+display_name = "Scriptorium Local Conversation Export"
+version = "1.0.0"
+repository = "https://github.com/foxsplendid/Provenance.git"
+revision = "1e3f1c022148c33f257d8a27502b50dbe906611d"
+stability = "candidate"
+delivery = "release-asset"
+directory = "capture"
+owner = "provenance"
+artifact_name = "scriptorium-local-conversation-export-1.0.0.zip"
+artifact_status = "source-build-only"
+artifact_sha256 = "1a85ec282f54bc9cff0c53bb595d7fb5ed37c5ce0121cb036b9fc80574998db8"

@@ -4,7 +4,8 @@
 Only explicitly supplied local source checkouts are used. The runner stages the
 public package trees into a temporary directory, builds local wheels without an
 index or build isolation, then verifies install, uninstall, reinstall, doctor,
-and the credential-free demo in a brand-new virtual environment.
+standalone component operation, and the credential-free demo in a brand-new
+virtual environment.
 """
 
 from __future__ import annotations
@@ -33,7 +34,7 @@ MODULES = {
     "scriptorium-steward": "steward",
     "provenance": "provenance",
 }
-ENTRIES = ("scriptorium", "steward", "prov-sync-pull")
+ENTRIES = ("scriptorium", "steward", "prov-status", "prov-sync-pull")
 SYSTEM_ENV = {
     "COMSPEC",
     "LANG",
@@ -365,6 +366,107 @@ def verify_installed(
         raise LifecycleFailure(stage, "The Provenance version did not match.")
 
 
+def tree_snapshot(root: Path, *, stage: str) -> tuple[tuple[str, str, int, int], ...]:
+    try:
+        resolved = root.resolve(strict=True)
+    except OSError as exc:
+        raise LifecycleFailure(stage, "A standalone data root is unavailable.") from exc
+    if root.is_symlink() or not resolved.is_dir():
+        raise LifecycleFailure(stage, "A standalone data root is unsafe.")
+    try:
+        records = [
+            (".", "directory", 0, resolved.stat().st_mtime_ns),
+        ]
+        for path in sorted(resolved.rglob("*"), key=lambda item: item.as_posix()):
+            if path.is_symlink():
+                raise LifecycleFailure(stage, "A standalone data root contains a link.")
+            relative = path.relative_to(resolved).as_posix()
+            stat = path.stat()
+            if path.is_dir():
+                kind, size = "directory", 0
+            elif path.is_file():
+                kind, size = "file", stat.st_size
+            else:
+                raise LifecycleFailure(
+                    stage, "A standalone data root contains a special file."
+                )
+            records.append((relative, kind, size, stat.st_mtime_ns))
+    except OSError as exc:
+        raise LifecycleFailure(stage, "A standalone data root could not be inspected.") from exc
+    return tuple(records)
+
+
+def verify_standalone_components(
+    scripts: Path,
+    *,
+    root: Path,
+    env: dict[str, str],
+) -> None:
+    provenance_home = root / "standalone-provenance"
+    provenance_home.mkdir()
+    provenance_env = dict(env)
+    provenance_env["PROVENANCE_HOME"] = str(provenance_home)
+    before = tree_snapshot(provenance_home, stage="standalone-provenance")
+    run(
+        [entry(scripts, "prov-status")],
+        stage="standalone-provenance",
+        cwd=root,
+        env=provenance_env,
+    )
+    if tree_snapshot(provenance_home, stage="standalone-provenance") != before:
+        raise LifecycleFailure(
+            "standalone-provenance", "The read-only Provenance status command wrote data."
+        )
+
+    vault = root / "standalone-steward-vault"
+    projects = vault / "Projects"
+    projects.mkdir(parents=True)
+    (projects / "synthetic-system.md").write_text(
+        "---\n"
+        "schema_version: project/1.0\n"
+        "project_id: synthetic-system\n"
+        "title: Synthetic system maintenance\n"
+        "status: active\n"
+        "priority: high\n"
+        "---\n",
+        encoding="utf-8",
+    )
+    dashboard = projects / "_总纲.md"
+    command = [entry(scripts, "steward"), "portfolio", "--vault", vault]
+    run(command, stage="standalone-steward-preview", cwd=root, env=env)
+    if dashboard.exists():
+        raise LifecycleFailure(
+            "standalone-steward-preview", "The Steward preview wrote a dashboard."
+        )
+    run([*command, "--run"], stage="standalone-steward-run", cwd=root, env=env)
+    try:
+        first = dashboard.read_bytes()
+        text = first.decode("utf-8")
+    except (OSError, UnicodeError) as exc:
+        raise LifecycleFailure(
+            "standalone-steward-run", "The Steward dashboard was unavailable."
+        ) from exc
+    if (
+        "<!-- steward:portfolio:begin" not in text
+        or "<!-- steward:portfolio:end -->" not in text
+        or "synthetic-system" not in text
+    ):
+        raise LifecycleFailure(
+            "standalone-steward-run", "The Steward dashboard was incomplete."
+        )
+    run([*command, "--run"], stage="standalone-steward-idempotent", cwd=root, env=env)
+    try:
+        second = dashboard.read_bytes()
+    except OSError as exc:
+        raise LifecycleFailure(
+            "standalone-steward-idempotent", "The Steward dashboard was unavailable."
+        ) from exc
+    if second != first:
+        raise LifecycleFailure(
+            "standalone-steward-idempotent", "The Steward dashboard was not idempotent."
+        )
+
+
 def uninstall(
     python: Path, scripts: Path, *, cwd: Path, env: dict[str, str]
 ) -> None:
@@ -575,6 +677,7 @@ def execute(args: argparse.Namespace) -> dict[str, Any]:
             "uninstall": "not-run",
             "reinstall": "not-run",
             "doctor_and_demo": "not-run",
+            "standalone_components": "not-run",
             "version_transition": transition,
         }
         install(python, wheels, cwd=root, env=runtime_env, stage="clean-install")
@@ -641,6 +744,20 @@ def execute(args: argparse.Namespace) -> dict[str, Any]:
                     {"name": "verify-upgrade", "status": "passed"},
                 ]
             )
+        verify_standalone_components(
+            scripts,
+            root=root,
+            env=runtime_env,
+        )
+        lifecycle["standalone_components"] = "passed"
+        stages.extend(
+            [
+                {"name": "standalone-provenance", "status": "passed"},
+                {"name": "standalone-steward-preview", "status": "passed"},
+                {"name": "standalone-steward-run", "status": "passed"},
+                {"name": "standalone-steward-idempotent", "status": "passed"},
+            ]
+        )
         verify_demo(
             scripts,
             root=root,
