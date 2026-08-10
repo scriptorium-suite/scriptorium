@@ -356,12 +356,18 @@ def run_demo(
         "artifacts": [],
         "expected_artifacts": [
             "fixtures/library-kb.v1.1.json",
+            "fixtures/parsed-paper.v1.json",
+            "fixtures/reading-note.v1.json",
+            "fixtures/review.v1.json",
+            "fixtures/lineage-graph.v1.json",
             "workspace/Projects/synthetic-catalyst-discovery.md",
             "workspace/Reviews/ai4science-materials.md",
             "workspace/Reports/provenance-search.txt",
+            "workspace/Reports/context-capsule.json",
             "workspace/Reports/provenance-mcp.jsonl",
             "provenance/memory/library.json",
             "provenance/memory/projects.json",
+            "provenance/memory/research-artifacts.json",
             "provenance/search-index.db",
             "demo-report.json",
         ],
@@ -381,13 +387,21 @@ def run_demo(
         draft_path = fixtures / "review-draft.v1.json"
         review_path = workspace / "Reviews" / "ai4science-materials.md"
         kb_path = fixtures / "library-kb.v1.1.json"
+        research_paths = [
+            fixtures / "parsed-paper.v1.json",
+            fixtures / "reading-note.v1.json",
+            fixtures / "review.v1.json",
+            fixtures / "lineage-graph.v1.json",
+        ]
         project_path = workspace / "Projects" / "synthetic-catalyst-discovery.md"
         search_path = workspace / "Reports" / "provenance-search.txt"
+        context_path = workspace / "Reports" / "context-capsule.json"
         mcp_path = workspace / "Reports" / "provenance-mcp.jsonl"
         workspace_readme = workspace / "README.md"
         prompt_path = input_path.parent / "REVIEW-PROMPT.md"
         library_memory_path = provenance_home / "memory" / "library.json"
         project_memory_path = provenance_home / "memory" / "projects.json"
+        research_memory_path = provenance_home / "memory" / "research-artifacts.json"
         search_index_path = provenance_home / "search-index.db"
         config_dir = root / "config"
 
@@ -397,15 +411,18 @@ def run_demo(
                 report_path,
                 kb_path,
                 draft_path,
+                *research_paths,
                 project_path,
                 workspace_readme,
                 input_path,
                 prompt_path,
                 review_path,
                 search_path,
+                context_path,
                 mcp_path,
                 library_memory_path,
                 project_memory_path,
+                research_memory_path,
                 search_index_path,
             ],
         )
@@ -446,10 +463,19 @@ def run_demo(
 
         steward = find_script(roots["steward"], "steward")
         prov_ingest_library = find_script(roots["provenance"], "prov-ingest-library")
+        prov_ingest_research = find_script(roots["provenance"], "prov-ingest-research")
         prov_ingest_vault = find_script(roots["provenance"], "prov-ingest-vault")
         prov_search = find_script(roots["provenance"], "prov-search")
         prov_mcp = find_script(roots["provenance"], "prov-mcp")
-        provenance_scripts = [prov_ingest_library, prov_ingest_vault, prov_search, prov_mcp]
+        prov_context = find_script(roots["provenance"], "prov-context")
+        provenance_scripts = [
+            prov_ingest_library,
+            prov_ingest_research,
+            prov_ingest_vault,
+            prov_search,
+            prov_mcp,
+            prov_context,
+        ]
         _assert(
             len({path.parent.resolve() for path in provenance_scripts}) == 1,
             "Provenance commands resolve to different script environments; install one compatible source checkout",
@@ -458,6 +484,8 @@ def run_demo(
         _assert(validator.is_file(), f"spec validator not found: {validator}")
 
         _write_asset("library-kb.v1.1.json", kb_path)
+        for path in research_paths:
+            _write_asset(path.name, path)
         _write_asset("review-draft.v1.json", draft_path)
         _write_asset("synthetic-project.md", project_path)
         _write_asset("workspace-readme.md", workspace_readme)
@@ -485,6 +513,15 @@ def run_demo(
             stages=stages,
         )
         report["assertions"]["contract_validated"] = True
+
+        _run_stage(
+            "validate literature research contracts",
+            [sys.executable, str(validator), *[str(path) for path in research_paths]],
+            cwd=root,
+            env=env,
+            stages=stages,
+        )
+        report["assertions"]["research_contracts_validated"] = True
 
         version_result = _run_stage(
             "check Steward version",
@@ -589,6 +626,67 @@ def run_demo(
         )
         report["assertions"]["memory_ingested"] = True
 
+        first_ingest = _run_stage(
+            "Provenance research artifact ingest",
+            [str(prov_ingest_research), *[str(path) for path in research_paths]],
+            cwd=root,
+            env=env,
+            stages=stages,
+        )
+        _assert(
+            "added=4 updated=0 total=4" in first_ingest.stdout,
+            "Provenance did not ingest exactly four new synthetic research artifacts",
+        )
+        research_memory = _load_json(research_memory_path)
+        research_artifacts = research_memory.get("artifacts") or []
+        _assert(
+            research_memory.get("schema_version") == "research-artifacts/1.0"
+            and len(research_artifacts) == 4
+            and {item.get("artifact_type") for item in research_artifacts}
+            == {"parsed-paper", "reading-note", "review", "lineage-graph"},
+            "Provenance research memory does not contain the four expected artifact types",
+        )
+        first_memory_bytes = research_memory_path.read_bytes()
+        second_ingest = _run_stage(
+            "Provenance research artifact idempotency",
+            [str(prov_ingest_research), *[str(path) for path in reversed(research_paths)]],
+            cwd=root,
+            env=env,
+            stages=stages,
+        )
+        _assert(
+            "added=0 updated=0 total=4" in second_ingest.stdout
+            and research_memory_path.read_bytes() == first_memory_bytes,
+            "repeating research artifact ingestion was not byte-stable and idempotent",
+        )
+        report["assertions"]["research_artifacts_ingested"] = True
+        report["assertions"]["research_ingest_idempotent"] = True
+
+        context_result = _run_stage(
+            "Provenance context capsule",
+            [str(prov_context), "--project", "synthetic-catalyst-discovery", "--json"],
+            cwd=root,
+            env=env,
+            stages=stages,
+        )
+        try:
+            context_capsule = json.loads(context_result.stdout)
+        except json.JSONDecodeError as exc:
+            raise DemoError(f"Provenance context capsule is not valid JSON: {exc}") from exc
+        capsule_artifacts = context_capsule.get("research_artifacts") or []
+        _assert(
+            context_capsule.get("project", {}).get("project_id")
+            == "synthetic-catalyst-discovery"
+            and {item.get("kind") for item in capsule_artifacts}
+            == {"parsed-paper", "reading-note", "review", "lineage-graph"}
+            and all(item.get("trust") == "reference_only" for item in capsule_artifacts)
+            and context_capsule.get("trust", {}).get("research_artifacts")
+            == "reference_only_not_approved_claims",
+            "context capsule did not expose all research artifacts through the reference-only boundary",
+        )
+        _write_managed_bytes(root, context_path, context_result.stdout.encode("utf-8"))
+        report["assertions"]["context_capsule_reference_only"] = True
+
         _run_stage(
             "Provenance search build",
             [str(prov_search), "--build"],
@@ -626,6 +724,15 @@ def run_demo(
                 "method": "tools/call",
                 "params": {"name": "search_brain", "arguments": {"query": "calibration", "limit": 5}},
             },
+            {
+                "jsonrpc": "2.0",
+                "id": 4,
+                "method": "tools/call",
+                "params": {
+                    "name": "get_context_capsule",
+                    "arguments": {"project_id": "synthetic-catalyst-discovery"},
+                },
+            },
         ]
         request_text = "\n".join(json.dumps(item, separators=(",", ":")) for item in requests) + "\n"
         mcp_result = _run_stage(
@@ -645,7 +752,7 @@ def run_demo(
                     continue
                 if isinstance(response, dict) and isinstance(response.get("id"), int):
                     responses[response["id"]] = response
-        _assert(set(responses) == {0, 1, 2, 3}, "Provenance MCP did not return all four responses")
+        _assert(set(responses) == {0, 1, 2, 3, 4}, "Provenance MCP did not return all five responses")
         initialize = responses[0]
         _assert(
             initialize.get("jsonrpc") == "2.0"
@@ -664,12 +771,22 @@ def run_demo(
         portfolio_text = _mcp_text(responses[1], 1)
         context_text = _mcp_text(responses[2], 2)
         search_text = _mcp_text(responses[3], 3)
+        capsule_text = _mcp_text(responses[4], 4)
         _assert(
             "Synthetic Catalyst Discovery" in portfolio_text
             and "Physics-informed learning for materials discovery" in context_text
             and "Active learning for closed-loop materials experiments" in context_text
             and "id=lit:DEMO0002" in search_text,
             "Provenance MCP responses did not surface the expected project and literature context",
+        )
+        _assert(
+            "Context Capsule: Synthetic Catalyst Discovery" in capsule_text
+            and "Research artifact hints (reference only)" in capsule_text
+            and "[parsed-paper]" in capsule_text
+            and "[reading-note]" in capsule_text
+            and "[review]" in capsule_text
+            and "[lineage-graph]" in capsule_text,
+            "Provenance MCP context capsule did not preserve the reference-only research hints",
         )
         mcp_path.write_bytes(mcp_result.stdout.encode("utf-8"))
         report["assertions"]["mcp_context_verified"] = True

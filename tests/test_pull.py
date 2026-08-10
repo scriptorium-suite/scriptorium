@@ -29,7 +29,7 @@ def component_report(
     summary["codex_found"] = 1
     return {
         "format_version": 1,
-        "generated_by": {"name": "provenance", "version": "0.17.0"},
+        "generated_by": {"name": "provenance", "version": "0.18.0"},
         "operation": "pull",
         "mode": mode,
         "status": status,
@@ -338,7 +338,7 @@ class PullTests(unittest.TestCase):
                 with self.assertRaisesRegex(
                     PullError, "configured Provenance root is unavailable"
                 ):
-                    _resolve_provenance(None, expected_version="0.17.0")
+                    _resolve_provenance(None, expected_version="0.18.0")
             installed.assert_not_called()
 
     def test_environment_is_narrow_and_raw_stderr_is_suppressed(self):
@@ -444,14 +444,14 @@ class PullTests(unittest.TestCase):
                 encoding="utf-8",
             )
             with self.assertRaisesRegex(PullError, "incompatible Provenance"):
-                _resolve_provenance(root, expected_version="0.17.0")
+                _resolve_provenance(root, expected_version="0.18.0")
 
     def test_non_json_extra_stdout_and_timeout_fail_closed(self):
         with self.assertRaisesRegex(PullError, "non-JSON or extra stdout"):
             _parse_component_report(
                 json.dumps(component_report()) + "\nlog line",
                 expected_mode="preview",
-                expected_version="0.17.0",
+                expected_version="0.18.0",
                 process_exit_code=0,
             )
 
@@ -499,18 +499,18 @@ class PullTests(unittest.TestCase):
         report, producer = _parse_component_report(
             json.dumps(component_report(status="blocked", exit_code=1)),
             expected_mode="preview",
-            expected_version="0.17.0",
+            expected_version="0.18.0",
             process_exit_code=1,
         )
         self.assertEqual(report["exit_code"], 1)
-        self.assertEqual(producer["version"], "0.17.0")
+        self.assertEqual(producer["version"], "0.18.0")
 
     def test_report_mismatch_or_wrong_producer_is_rejected(self):
         with self.assertRaisesRegex(PullError, "exit code disagrees"):
             _parse_component_report(
                 json.dumps(component_report()),
                 expected_mode="preview",
-                expected_version="0.17.0",
+                expected_version="0.18.0",
                 process_exit_code=1,
             )
         wrong = component_report()
@@ -519,7 +519,7 @@ class PullTests(unittest.TestCase):
             _parse_component_report(
                 json.dumps(wrong),
                 expected_mode="preview",
-                expected_version="0.17.0",
+                expected_version="0.18.0",
                 process_exit_code=0,
             )
 
@@ -530,7 +530,7 @@ class PullTests(unittest.TestCase):
             _parse_component_report(
                 json.dumps(boolean_version),
                 expected_mode="preview",
-                expected_version="0.17.0",
+                expected_version="0.18.0",
                 process_exit_code=0,
             )
 
@@ -540,7 +540,7 @@ class PullTests(unittest.TestCase):
             _parse_component_report(
                 json.dumps(non_string_status),
                 expected_mode="preview",
-                expected_version="0.17.0",
+                expected_version="0.18.0",
                 process_exit_code=0,
             )
 
@@ -550,7 +550,7 @@ class PullTests(unittest.TestCase):
             _parse_component_report(
                 json.dumps(non_integer_exit),
                 expected_mode="preview",
-                expected_version="0.17.0",
+                expected_version="0.18.0",
                 process_exit_code=0,
             )
 
@@ -560,11 +560,11 @@ class PullTests(unittest.TestCase):
         parsed, producer = _parse_component_report(
             json.dumps(additive),
             expected_mode="preview",
-            expected_version="0.17.0",
+            expected_version="0.18.0",
             process_exit_code=0,
         )
         self.assertNotIn("private_future_field", parsed)
-        self.assertEqual(producer, {"name": "provenance", "version": "0.17.0"})
+        self.assertEqual(producer, {"name": "provenance", "version": "0.18.0"})
 
     def test_nested_component_data_is_rebuilt_as_aggregate_only(self):
         report = component_report(status="blocked", exit_code=1)
@@ -612,7 +612,7 @@ class PullTests(unittest.TestCase):
         parsed, _ = _parse_component_report(
             json.dumps(report),
             expected_mode="preview",
-            expected_version="0.17.0",
+            expected_version="0.18.0",
             process_exit_code=1,
         )
 
@@ -701,7 +701,7 @@ class PullTests(unittest.TestCase):
                     _parse_component_report(
                         json.dumps(report),
                         expected_mode="preview",
-                        expected_version="0.17.0",
+                        expected_version="0.18.0",
                         process_exit_code=report["exit_code"],
                     )
 

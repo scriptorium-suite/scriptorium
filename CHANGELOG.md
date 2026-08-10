@@ -1,5 +1,38 @@
 # Changelog
 
+## 0.2.0 (candidate) — 2026-07-22
+
+- Add `scriptorium resume`, backed by Provenance's bounded, read-only Context
+  Capsule. It restores approved project state, explicitly labels auto-applied
+  low-risk progress, and keeps literature artifacts reference-only.
+- Extend the synthetic demo with all four literature-reading artifacts, atomic
+  idempotent ingestion, reference hints, and privacy assertions.
+- Exercise a synthetic software project through Codex and Claude Code workspace
+  adapters, proving that fresh processes recover the same reviewed project state.
+- Require compatible `prov-context` and `prov-ingest-research` commands in Public
+  Alpha diagnostics, including an actual runtime-version probe.
+- Move the candidate compatibility baseline to `scriptorium-spec` 2.3.0 for the
+  additive `project/1.1` profile field while retaining `project/1.0` compatibility.
+- Add pinned `core`, `research`, `slides`, `full`, and `capture` component profiles;
+  add a preview-first source installer and an independently downloadable Capture
+  Release asset path without splitting Capture into another repository.
+- Add general, engineering, software, and research project templates. Experimental
+  run/evidence promotion remains on development branches and outside stable-core
+  acceptance.
+- Add the safety-reviewed `scriptorium migrate` CLI to the stable-core candidate for
+  explicit Markdown/PDF copies: write-free plan, create-if-absent apply,
+  canonical private state, cross-process verify/reapply recovery, and rollback.
+  Reports and errors remain aggregate-only and path-free; linked repositories stay
+  authoritative and are registered rather than copied wholesale.
+- Add an offline, synthetic Steward-to-Lectern acceptance path that validates a
+  two-paper handoff through Lectern's production graph, stops for outline approval
+  with no persistent pre-approval PPTX, compiles an editable deck, and
+  scans transferable artifacts for paths, email addresses, and credential shapes.
+- Add a temporary clean-environment lifecycle gate that builds local wheels with
+  package indexes disabled, verifies install/uninstall/reinstall and the synthetic
+  demo, and exercises the public v0.1.0-to-current version transition. Live Agent,
+  PowerPoint, external-user, and fresh remote-CI acceptance remain explicit gates.
+
 ## 0.1.0 — 2026-07-20
 
 - Add `scriptorium inventory`, a deterministic, zero-write preview for explicitly
@@ -34,7 +67,7 @@
 - Add the content-free `scriptorium status` control-plane summary over trusted
   doctor and pull-preview reports. It exposes allowlisted readiness, freshness,
   aggregate backlog counts, and fixed review cues without forwarding paths,
-  identifiers, research content, stderr, or an implicit `--run` authorization.
+  identifiers, project content, stderr, or an implicit `--run` authorization.
   It authorizes no suite project/data writes while accurately disclosing external
   readiness probes.
 - Report content-free path-selection provenance across `doctor`, `pull`, and
@@ -50,8 +83,9 @@
   subprocesses cannot reuse the user's real application configuration or caches.
 - Document verified product-design inspirations, independent implementation boundaries,
   current capability gaps, and the policy for future third-party reuse.
-- Wire the canonical research skill to the aggregate `agent-fill` / `project-resolution`
-  actions through read-only unresolved inspection, allowlisted scaffold reads, and an
+- Wire the canonical project skill (with its compatibility-preserved directory name)
+  to the aggregate `agent-fill` / `project-resolution` actions through read-only
+  unresolved inspection, allowlisted scaffold reads, and an
   atomic credential-checked fill command; candidate and authoritative writes require
   separate approval and protected paths are never constructed by the skill.
 - Refuse unresolved-project session summaries and preserve those events for explicit,

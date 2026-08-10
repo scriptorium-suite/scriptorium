@@ -72,6 +72,11 @@ class InitCliTests(unittest.TestCase):
             self.assertTrue(
                 (workspace / "Projects" / "catalyst-screening.md").is_file()
             )
+            project_note = (
+                workspace / "Projects" / "catalyst-screening.md"
+            ).read_text(encoding="utf-8")
+            self.assertIn('profile: "general"', project_note)
+            self.assertIn("## Goal and scope", project_note)
             self.assertTrue(provenance_home.is_dir())
             self.assertTrue(resolve_config_path(config_dir).is_file())
 

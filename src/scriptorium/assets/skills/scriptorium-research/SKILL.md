@@ -1,34 +1,44 @@
 ---
 name: scriptorium-research
-description: Advance an AI4Science project from a vague intuition or existing evidence into reviewable plans, literature artifacts, experiments, papers, and slide handoffs in a Scriptorium Markdown workspace. Use when the user asks to start, resume, investigate, synthesize, plan, review, report, sync, or close out research with Scriptorium, Steward, Provenance, or Lectern, including when scriptorium pull reports agent-fill or project-resolution.
+description: Continue a long-running project from user-owned local context into reviewable decisions, actions, checkpoints, and deliverables. Supports general, engineering, personal software, and research profiles in a Scriptorium Markdown workspace. The skill id is retained for compatibility with earlier research-first releases.
 ---
 
-# Scriptorium Research
+# Scriptorium Project Continuity
 
-Use Scriptorium as the orchestration layer for a research workflow. Keep Markdown and
+Use Scriptorium as the continuity layer for a long-running project. Keep Markdown and
 versioned contract files as the collaboration surface; treat each component's public
-CLI, read-only MCP tools, and owned files as its stable interface.
+CLI, read-only MCP tools, and owned files as its stable interface. The installed skill
+directory keeps the legacy `scriptorium-research` name so existing workspaces continue
+to resolve it; research is one supported profile rather than the product boundary.
 
-## Advance the research in a verifiable loop
+## Advance the project in a verifiable loop
 
 1. Orient to the workspace.
-   - Identify the workspace, project, research question, current stage, and requested
+   - Identify the workspace, project objective, selected profile, current stage, and requested
      deliverable. Run `scriptorium doctor --json --workspace <path>` when available.
+   - At the start of a continuing project, prefer
+     `scriptorium resume --project <project-id> --json` or Provenance MCP
+     `get_context_capsule`. Use the bounded capsule as navigation; retrieve older
+     sessions or source text only when the current task needs them.
    - Read the relevant `Projects/*.md` note and existing contract artifacts before
      proposing changes.
-   - Query Provenance through `get_current_context`, `get_portfolio`, or
-     `search_brain` when available. Treat memory as retrieval context, never as a
-     replacement for source files or primary evidence.
+   - Fall back to `get_current_context`, `get_portfolio`, or `search_brain` when the
+     capsule entry is unavailable. Treat memory and `reference_only` capsule items as
+     retrieval context, never as approved claims or replacements for primary evidence.
 2. Frame the next decision.
    - Restate the question, evidence already available, assumptions, constraints, and
      a concrete success check.
-   - Build a compact research frame: falsifiable hypothesis or decision, competing
-     explanations, an observation that would weaken the preferred explanation, the
-     smallest discriminating analysis or experiment, and the intended deliverable.
+   - For a general, engineering, or software project, state the decision, constraints,
+     alternatives, smallest verifiable change, rollback or failure signal, and intended
+     deliverable. For a research profile, additionally state the falsifiable hypothesis,
+     competing explanations, and the smallest discriminating analysis or experiment.
    - Ask one focused question when a missing answer would materially change the work;
      otherwise state the assumption and continue.
    - Choose the smallest useful next step instead of expanding the project silently.
-3. Gather and assess evidence.
+3. Gather and assess sources.
+   - Prefer the project's authoritative Markdown, documents, repositories, issue records,
+     runbooks, logs, and prior reviewed decisions. Treat generated summaries as navigation,
+     not as replacements for those sources.
    - For literature work, prefer existing `library-kb`, `parsed-paper`,
      `reading-note`, `lineage-graph`, and `review` artifacts. Use Steward's public
      commands and installed literature skills when they fit.

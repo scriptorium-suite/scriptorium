@@ -1018,6 +1018,51 @@ class InitTests(unittest.TestCase):
                 f"{change['root']}:{change['path']}" for change in report["changes"]
             ))
 
+    def test_general_engineering_and_software_templates_are_distinct(self):
+        expected = {
+            "general": ("## Goal and scope", "## Source material"),
+            "engineering": ("## System context", "## Constraints and risks"),
+            "software": ("## Product intent", "## Design decisions"),
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            for template, headings in expected.items():
+                arguments = self.paths(root / template)
+                report = run_init(
+                    **arguments,
+                    template=template,
+                    idea=f"Initial context for {template}",
+                    run=True,
+                )
+                self.assertEqual(report["exit_code"], 0)
+                note = (
+                    arguments["workspace"]
+                    / "Projects"
+                    / "catalyst-screening.md"
+                ).read_text(encoding="utf-8")
+                self.assertIn("schema_version: project/1.1", note)
+                self.assertIn(f'profile: "{template}"', note)
+                self.assertIn(f"Initial context for {template}", note)
+                for heading in headings:
+                    self.assertIn(heading, note)
+
+    def test_unknown_template_is_rejected_before_writes(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            arguments = self.paths(root)
+            with self.assertRaisesRegex(InitError, "template"):
+                run_init(**arguments, template="unknown", run=True)
+            self.assertFalse(arguments["workspace"].exists())
+
+    def test_managed_roots_reject_the_user_home_directory(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            arguments = self.paths(root)
+            arguments["provenance_home"] = Path.home()
+            with self.assertRaisesRegex(InitError, "user home"):
+                run_init(**arguments, run=True)
+            self.assertFalse(arguments["workspace"].exists())
+
 
 if __name__ == "__main__":
     unittest.main()

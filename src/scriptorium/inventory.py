@@ -1,4 +1,4 @@
-"""Content-free inventory preview for explicitly selected research sources."""
+"""Content-free inventory preview for explicitly selected project sources."""
 
 from __future__ import annotations
 

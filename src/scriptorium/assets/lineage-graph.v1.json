@@ -1,0 +1,42 @@
+{
+  "schema_version": "lineage-graph/1.0",
+  "generated_by": "scriptorium synthetic fixture",
+  "direction": {
+    "query": "[SYNTHETIC] Physics-informed active learning for catalyst discovery",
+    "scope_method": "synthetic own-library citation match",
+    "created": "2026-07-15T10:15:00Z"
+  },
+  "nodes": [
+    {
+      "citekey": "chen2022PhysicsInformed",
+      "title": "[SYNTHETIC] Physics-informed learning for materials discovery",
+      "year": "2022",
+      "cluster": "synthetic-foundations"
+    },
+    {
+      "citekey": "liu2024ActiveLearning",
+      "title": "[SYNTHETIC] Active learning for closed-loop materials experiments",
+      "year": "2024",
+      "cluster": "synthetic-closed-loop"
+    }
+  ],
+  "edges": [
+    {
+      "from": "liu2024ActiveLearning",
+      "to": "chen2022PhysicsInformed",
+      "relation": "cites",
+      "evidence": "[SYNTHETIC] Generated reference recorded in parsed-paper.v1.json."
+    }
+  ],
+  "clusters": [
+    {
+      "id": "synthetic-foundations",
+      "label": "[SYNTHETIC] Physics-informed foundations"
+    },
+    {
+      "id": "synthetic-closed-loop",
+      "label": "[SYNTHETIC] Closed-loop experiment selection"
+    }
+  ],
+  "timeline": ["chen2022PhysicsInformed", "liu2024ActiveLearning"]
+}

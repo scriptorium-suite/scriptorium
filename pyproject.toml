@@ -4,16 +4,17 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "scriptorium-suite"
-version = "0.1.0"
-description = "Thin, agent-native entry point for the Scriptorium research workflow suite"
+version = "0.2.0"
+description = "Local-first project context and continuity entry point for long-running work"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "Apache-2.0" }
 authors = [{ name = "Scriptorium Suite" }]
-keywords = ["ai4science", "research", "agents", "workflow"]
+keywords = ["agents", "project-memory", "context", "workflow", "ai4science"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Environment :: Console",
+    "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
     "License :: OSI Approved :: Apache Software License",
     "Operating System :: Microsoft :: Windows",
