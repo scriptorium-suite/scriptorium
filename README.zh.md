@@ -1,500 +1,156 @@
 # Scriptorium
 
-Scriptorium 是面向长期复杂工作的本地优先、模型中立的项目上下文与协作记忆产品。
-本仓库是统一产品入口，通过公开命令和版本化文件协调彼此独立的组件，不导入组件内部
-实现，也不取得用户项目资料的所有权。科研是要求最高的旗舰示例，而不是产品边界；
-同一核心也支持工程系统维护和个人软件开发项目。
+[![CI](https://github.com/scriptorium-suite/scriptorium/actions/workflows/ci.yml/badge.svg)](https://github.com/scriptorium-suite/scriptorium/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/scriptorium-suite/scriptorium)](https://github.com/scriptorium-suite/scriptorium/releases)
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
-`scriptorium components --profile <名称>` 可以查看 `core`、`research`、`slides`、
-`full` 或 `capture` 对应的固定组件、版本和提交。`scriptorium install <名称>
---target <目录>` 默认只预览，用户明确增加 `--run` 后才会联网安装。Capture 不是
-独立仓库，而是 Provenance 维护的可选浏览器导出器；正式发布时通过单独 Release ZIP
-交付。附件尚未实际发布前，命令会明确提示不可用，不会伪装成已经完成。
+Scriptorium 是一个本地优先、模型中立的项目控制层。它解决的问题不是“再做一个聊天机器人”，而是让人、AI Agent、本地资料、文献工具和交付物持续使用同一个可恢复、可审查、可追溯的项目状态。
 
-`scriptorium init` 默认生成通用项目模板，也支持 `--template engineering`、
-`--template software` 和 `--template research`。这些模板共享同一套项目身份、状态、
-会话收尾和上下文恢复机制。
+![Scriptorium 套件总览](docs/assets/suite-overview.svg)
 
-已有项目按资料类型显式接入，而不是整盘扫描或整仓复制：代码和工程仓库通过
-`init --linked-repo` 登记并继续作为权威来源；用户挑选的 Markdown/PDF 才进入
-`inventory -> migrate`；本地 Agent 日志或 Capture 导出由 Provenance 接入；只有需要
-Zotero 和文献治理时才增加 Steward。仅仅登记仓库不会复制其中的源码、凭据或个人目录。
+## 为什么需要它
 
-> **Public Alpha v0.2.0 候选版：** 当前 umbrella 仓库已交付真实项目的安全初始化、一个
-> 通过 `scriptorium demo` 跑通的合成纵向切片、只读诊断入口 `scriptorium doctor`、
-> 不暴露内容的 `scriptorium status` 控制面状态摘要、仅盘点显式本地来源且零写入的
-> `scriptorium inventory` 预览，以及显式、项目级的 Codex /
-> Claude Code 技能安装器。已确认的按需入口 `scriptorium pull` 与有边界、只读的
-> `scriptorium resume` Context Capsule 均通过 Provenance 的机器可读公共命令交付。
-> 经过安全复审的 `scriptorium migrate` 已纳入稳定核心候选版，只复制用户显式选择的
-> Markdown/PDF，不会把整座代码仓库或个人目录自动搬入工作区。
-> 已发布基线具有 GitHub-hosted Windows 证据；当前工作树也已在本地通过 core、
-> research 组合与 Capture-only 安装，以及软件项目经 Codex / Claude Code 两种工作区
-> 适配器恢复相同上下文的合成验收。重新运行远端 CI、真实模型登录和真实 provider
-> 幻灯片生成仍是发布门槛。
+AI Agent 很适合协助复杂项目，但大量关键上下文会散落在聊天记录、临时文件和个人目录里：这次用了哪些资料，哪些判断已经被接受，哪些仍然只是推测，下次应该从哪里继续。Scriptorium 把这些过程沉淀成一个本地项目工作区，让后续协作可以接得上。
 
-稳定核心候选版有意停在资料接入、会话收尾、人工审批和上下文恢复。实验运行、
-论断—证据晋升等增强能力继续保存在开发分支，不进入当前组件目录，也不计入稳定核心
-的可用性声明。
+当前第一个经过验证的场景是科研和 AI4Science 风格工作流，因为科研对来源、证据、文献、人工审查和交付物要求更高。但 Scriptorium 的口径并不限制在科研上，它也可以服务工程系统维护、产品调研、个人大型知识项目，或者任何需要长期 AI 协作记忆的复杂工作。
 
-## Windows 最短使用路径
+## 当前公开版能做什么
 
-克隆本入口仓库并执行 `uv sync --locked` 后，先查看将要安装的固定组件和提交；只有
-确认无误后才增加 `--run`：
+当前稳定版重点完成产品流程的前半段：创建干净工作区，把本地资料纳入管理，安装可协同组件，并让后续 AI 会话从明确的项目状态恢复。
+
+| 能力 | 当前状态 |
+| --- | --- |
+| 工作区初始化 | 稳定：创建项目目录、配置、审批入口和本地状态文件夹。 |
+| 资料盘点与迁移 | 稳定：对选定 Markdown/PDF 先预览，再安全复制。 |
+| 项目恢复 | 稳定：通过 Provenance 获取有边界的上下文胶囊，而不是直接加载原始历史。 |
+| 组件安装 | 稳定：从组件目录安装固定版本的套件组件。 |
+| Capture 安装 | 稳定：从 Provenance release asset 安装浏览器对话导出扩展。 |
+| 证据审批与执行闭环 | 开发分支中：不作为当前稳定版主流程宣传。 |
+| PPT / 汇报生成 | 可选组件方向；当前版本暂不作为主线重点。 |
+
+## Windows 快速开始
+
+Scriptorium 面向有一定 GitHub 开源项目配置基础的用户。
 
 ```powershell
-uv run scriptorium components --profile core
-uv run scriptorium install core --target D:\Scriptorium\components
-uv run scriptorium install core --target D:\Scriptorium\components --run
-. D:\Scriptorium\components\scriptorium-env.ps1
-
-uv run scriptorium init `
-  --workspace D:\Projects\my-project `
-  --provenance-home D:\Projects\my-project-memory `
-  --project-id my-project `
-  --title "我的长期项目" `
-  --template software `
-  --host codex `
-  --run
-uv run scriptorium host install codex
-
-# 在该工作区完成一次 Agent 协作后：
-uv run scriptorium pull --project my-project --json
-uv run scriptorium pull --project my-project --run --json
-# 按报告完成 Agent 填充或 Approvals.md 审阅，再次 pull 后继续：
-uv run scriptorium resume --project my-project
-```
-
-需要文献治理时选择 `research` 组合，它只在核心上增加 Steward。只需要浏览器导出器时，
-使用已校验的 Capture Release ZIP；该路径不会克隆 Provenance。Provenance、Steward 和
-Lectern 仍可分别从各自仓库独立使用。
-
-[English](README.md) · [架构、使用与分层验收](docs/architecture-and-acceptance.zh-CN.md) · [中文产品案例](docs/case-study.zh-CN.md) · [展示与证据](docs/showcase/README.zh-CN.md) · [契约单一事实源](https://github.com/scriptorium-suite/scriptorium-spec) · [设计借鉴与致谢](ACKNOWLEDGEMENTS.zh.md)
-
-![Scriptorium Public Alpha 合成黄金路径证据](docs/showcase/demo-poster.svg)
-
-## 当前真正可用的内容
-
-`scriptorium init` 可以预览或创建真实长期项目的最小结构：套件配置、彼此分离的
-Markdown workspace 与 Provenance 数据根目录，以及一份有效的 `project/1.1` 项目笔记
-（旧的 `project/1.0` 仍可读取）。
-默认只预览，必须显式增加 `--run` 才会写入；已有文件不会被重写。选择 host 只会把
-该选择记录到配置中，不会安装 host adapter、模型或 hook；init 不申请网络动作，也不
-读取 provider 凭据。初始化后，如果没有更高优先级的 CLI 参数或环境变量，
-`host install`、`doctor`、`status` 和 `pull` 可以从套件配置解析相应的
-workspace、数据根与项目选择。
-
-`doctor`、`status` 和 `pull` 会说明各根目录来自 CLI、环境变量、套件配置还是自动发现。
-`status` 与 `pull` 报告不会回显实际路径；`doctor` 是详细的本地诊断，其报告包含
-已解析路径，分享前必须审阅。若环境变量选择与套件配置不一致，命令会显示显著警告；
-`pull --run` 将 fail closed，直到用户用显式 CLI 根目录消除歧义。所选 Codex 日志目录
-不可用时，会被视为“0 个会话 + 可执行的设置提示”，而不是内部错误；套件也不会隐式
-创建该目录。
-
-`scriptorium demo` 会建立一个隔离的 Markdown 工作区，并通过真实公开接口跑通
-一条合成 AI4Science 文献工作流：
-
-1. 使用 `scriptorium-spec` 校验合成 `library-kb/1.1`；
-2. 调用 Steward 选出两篇主题文献，并从录制的 Agent 草稿组装综述；
-3. 调用 Provenance 摄取文献库与 Markdown 项目；
-4. 校验并原子摄取四类合成文献阅读工件；
-5. 构建和查询本地全文索引；
-6. 通过 Provenance MCP 验证项目组合、有边界的 Context Capsule、仅供参考的
-   文献线索和文献检索；
-7. 生成可阅读成果与机器可读的 `demo-report.json`。
-
-该流程不需要 API Key、Zotero、Obsidian、浏览器扩展或 Agent 登录。源码安装
-完成后，此 demo 路径被设计为不申请网络动作；它不会调用在线模型，Agent 产出是
-明确标注的合成 fixture。报告也会说明：当前网络边界来自代码与策略约束，尚未由
-操作系统级沙箱观测。Demo 通过只证明契约与组件集成链路可复现，不等于完整
-Public Alpha 已就绪，更不代表其中内容是真实科研结论。
-
-`scriptorium doctor` 独立检查安装与能力就绪度。它运行只读探针，不申请套件自身的
-网络动作或 GUI 启动，不打印 secret 值；可选组件只形成对应能力证据；并明确区分
-可运行的 Demo target 与完整 Public Alpha target。操作系统级子进程出站并未被观测。
-只有当检测到的 host CLI 与所选 workspace 中已登记、内容 canonical 的技能相匹配时，
-doctor 才会通过 host adapter 检查。它会真实探测 `prov-sync-pull --capabilities --json`，
-而不是把源码存在误报成可运行；Public Alpha 还要求显式 Provenance 数据根。
-
-`scriptorium pull` 是上述 Provenance 公共命令的薄封装。默认模式为零权威写入的预览，
-只有 `--run` 才显式授权本地摄取、捕获、单 worker 与审批队列刷新。它不会调用模型、
-安装 hook、申请网络动作或批准未勾选的声明。首次运行正常情况下可能返回
-`action-required`：所选 Agent 在当前会话审阅已脱敏 scaffold 并写入 fill；再次 pull
-才会提交低风险 timeline，并把高价值声明放入 `Approvals.md`。这些声明仍必须由用户
-勾选，之后的 pull 才会提交。
-
-`scriptorium resume` 是会话开始时读取的精炼视图。它只接受兼容 `prov-context`
-运行时返回的白名单 Capsule：把已批准项目状态、自动写入的低风险进度和仅供参考的
-文献/阅读工件明确分开；不会透传原始对话、草稿、已拒绝声明、组件 stderr 或本地路径。
-V0.2 端到端夹具会连续运行两个合成 Agent 会话，并验证第二次能恢复第一次经过审阅的
-项目状态。
-
-`scriptorium status` 是日常使用且不暴露内容的控制面状态摘要。它先重建 `doctor` 的
-Public Alpha 就绪结论；只有该边界就绪时，才执行一次 `pull` 预览。结果只包含
-白名单化的能力状态、工作流聚合计数和固定审阅提示，不会透传本地路径、项目或会话
-标识、项目正文、组件 stderr 或原始诊断细节，也绝不会调用 `--run`。`attention`
-是正常的 exit-0 待办；未就绪或安全阻断返回 1，可信 pull 预览报告错误或入口无法
-形成可信报告时返回 2。status 与其中的预览都不会授权套件写入项目或数据；就绪检查
-仍会调用外部版本/能力探针，其操作系统级副作用尚未被观测。
-
-`scriptorium inventory` 是已有项目资料进入套件前的安全盘点边界。它只扫描用户显式
-传入的 Markdown/PDF 来源、AI 对话导出或 Zotero 导出；只读取文件系统元数据与后缀，
-不会打开正文或压缩包、自动发现个人目录、写入迁移计划、调用组件、申请网络动作或
-调用模型。默认报告不含路径和文件名，只给出候选总数以及 workspace、文献原址引用、
-Provenance 导入审阅、Steward 审阅四类路由。该预览不验证文件内容、不去重、不复制
-资料，也不会声称迁移已经发生。在 Windows 上，命令会在预览期间以仅元数据句柄绑定
-选中对象，因此其他进程需等命令结束后才能重命名、删除或以数据写权限打开这些对象。
-
-`scriptorium migrate` 是稳定核心候选版的显式 Markdown/PDF 复制边界。`plan`
-零写入；首次 `apply` 必须再次给出已核对的来源；后续 `apply`、`verify` 和
-`rollback` 只凭 workspace 与批次标识恢复。预览只是 advisory，不是持久化执行快照；
-首次 `apply` 会重新扫描并哈希显式来源。目标文件通过同目录 hard link 以
-create-if-absent 方式发布，绝不覆盖。`apply` 使用随机、独占创建的
-`.scriptorium-*.stage`：同一个文件句柄完成复制、哈希、刷盘和文件身份检查后，才把
-stage 与身份封入私有 manifest，并发布为目标的同文件所有权锚点。若进程在封存前崩溃，
-可能留下未认领的随机 stage；系统不会猜测归属，也不会自动删除它。
-
-回滚会先持久化随机的同目录 quarantine 名，再用不覆盖的原子移动分别隔离目标和锚点，
-移动后重新检查内容与已记录文件身份，确认归属后才删除。能由这些记录属性识别的外部
-替代文件会尽量原子恢复到原路径；恢复受阻时保留在 quarantine 并 fail closed。
-该机制只协调单用户下的协作进程；最后一个链接消失后文件系统可能复用 inode/file ID，
-因此不宣称抵御恶意本地进程主动替换。自动回滚要求 Windows no-replace rename 或
-Linux `renameat2(RENAME_NOREPLACE)`；其他平台不降级执行。
-含绝对路径的私有 manifest 固定存放在 workspace 外的用户级 canonical 本地状态根，
-迁移来源不得与该私有状态根重叠，CLI 不提供任意 `state-root` 参数。终端和 JSON
-报告只含聚合计数与状态。迁移只复制
-文件，不会解析、索引、批准科研内容，也不会自动导入 Provenance。
-
-## Windows 源码快速体验
-
-前置条件：Git 与 Python 3.11+。先把四个仓库克隆到同一个父目录，使源码发现
-路径明确且可复现：
-
-```powershell
-mkdir scriptorium-workspace
-cd scriptorium-workspace
 git clone https://github.com/scriptorium-suite/scriptorium.git
-git clone https://github.com/scriptorium-suite/scriptorium-spec.git
-git clone https://github.com/scriptorium-suite/steward.git
-git clone https://github.com/foxsplendid/Provenance.git Provenance
-
 cd scriptorium
-python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install --no-deps -e .
-
-# Install the two runtime components into the same isolated environment:
-.\.venv\Scripts\python.exe -m pip install --no-deps -e ..\steward
-.\.venv\Scripts\python.exe -m pip install --no-deps -e ..\Provenance
+py -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -e .
+.\.venv\Scripts\scriptorium.exe doctor
 ```
 
-根据本地 Python 环境，editable 安装可能访问已配置的包索引以取得
-`setuptools>=68` 等声明的构建依赖。“运行期不申请网络动作”只适用于源码安装完成后，
-不代表离线安装保证。
+创建一个项目工作区：
 
-### 可选：预览已有本地资料
+```powershell
+.\.venv\Scripts\scriptorium.exe init `
+  --workspace D:\Research\demo-workspace `
+  --project-name "My long-running project"
+```
 
-只传入你主动选择的本地文件或目录。Zotero 与对话导出均为可选；实时 Zotero 数据库
-和 Agent profile 不会被自动发现。
+先预览本地资料，不直接复制：
 
 ```powershell
 .\.venv\Scripts\scriptorium.exe inventory `
-  --source 'D:\Research\Legacy Notes' `
-  --conversation-export 'D:\Exports\chat-history.zip' `
-  --zotero-export 'D:\Exports\library.bib'
+  --workspace D:\Research\demo-workspace `
+  --source D:\Research\notes `
+  --json
 ```
 
-该命令只做分类，始终保持 preview 模式。默认终端输出与 `--json` 都只包含计数和固定
-路由标签，不含本地路径、文件名、资料正文、哈希、大小或时间。扫描不完整或来源不安全
-时会 fail closed 并返回退出码 `1`；参数错误或入口边界内部失败返回 `2`，且不会回显
-敏感输入。
-
-### 安全复制显式选择的 Markdown/PDF
-
-先给批次一个稳定标识并检查聚合预览；首次执行时再次传入相同来源：
+后续 AI 会话从项目状态恢复：
 
 ```powershell
-$Legacy = 'D:\Research\Legacy Notes'
-$MigrationWorkspace = 'D:\Research\Scriptorium Workspace'
-$Batch = 'legacy-notes-001'
-
-.\.venv\Scripts\scriptorium.exe migrate plan `
-  --source $Legacy `
-  --workspace $MigrationWorkspace `
-  --batch-id $Batch `
-  --json
-
-.\.venv\Scripts\scriptorium.exe migrate apply `
-  --source $Legacy `
-  --workspace $MigrationWorkspace `
-  --batch-id $Batch `
-  --json
-
-# 恢复操作不再需要来源路径或旧 plan。
-.\.venv\Scripts\scriptorium.exe migrate verify `
-  --workspace $MigrationWorkspace `
-  --batch-id $Batch `
-  --json
-.\.venv\Scripts\scriptorium.exe migrate apply `
-  --workspace $MigrationWorkspace `
-  --batch-id $Batch `
-  --json
-.\.venv\Scripts\scriptorium.exe migrate rollback `
-  --workspace $MigrationWorkspace `
-  --batch-id $Batch `
-  --json
+.\.venv\Scripts\scriptorium.exe resume `
+  --workspace D:\Research\demo-workspace
 ```
 
-第二次 `apply` 是幂等/恢复检查，应返回 `unchanged`。目标文件系统必须支持 hard
-link；不支持时命令会 fail closed，不会降级到可能覆盖目标的方式。批次生效期间不要
-删除内部 `.scriptorium-*.stage` 所有权锚点或 `.scriptorium-*.rollback` quarantine；
-成功回滚会清理已登记条目。若进程在随机 stage 登记前崩溃，未认领 stage 只供人工核查，
-Scriptorium 不会认领或自动删除。首次使用时应先在合成资料或隔离副本上验证，审阅
-聚合计划，并在 `verify` 成功前继续把原始来源视为权威副本。
+## 套件如何组织
 
-### 真实项目的 10 分钟路径
+Scriptorium 是统一入口，其余组件保持独立可用。组件之间通过 [scriptorium-spec](https://github.com/scriptorium-suite/scriptorium-spec) 定义的公开文件契约协作，而不是互相调用私有内部 API。
 
-以下命令创建真实 Markdown 项目，而不是使用合成 demo。workspace 与 Provenance
-数据根必须是两个互不嵌套的独立目录；如果选择的是 Claude Code，请把示例中的
-`codex` 一致替换为 `claude-code`。
+| 仓库 | 作用 |
+| --- | --- |
+| [scriptorium](https://github.com/scriptorium-suite/scriptorium) | 产品入口、工作区生命周期、组件目录、安装 profile、状态检查和恢复命令。 |
+| [scriptorium-spec](https://github.com/scriptorium-suite/scriptorium-spec) | JSON Schema、样例和约定，是套件协同的数据契约。 |
+| [Provenance](https://github.com/foxsplendid/Provenance) | 本地项目记忆、资料摄取、脱敏、搜索、上下文胶囊、MCP 和会话回写。 |
+| [steward](https://github.com/scriptorium-suite/steward) | 文献和资料治理组件，负责阅读、审查、proposal 和 handoff 文件。 |
+| [Academic-Slides-Agent](https://github.com/foxsplendid/Academic-Slides-Agent) | 可选的汇报和幻灯片方向组件；当前稳定流程不依赖它。 |
 
-```powershell
-$Workspace = Join-Path $HOME "Research\ai4science-pilot"
-$ProvenanceHome = Join-Path $HOME "Research\scriptorium-data"
+Capture 不是独立仓库。它是 Provenance 发布出来的一个小型浏览器导出工具，可以通过 Scriptorium 组件目录单独安装。
 
-# Preview only: no file or directory is created.
-.\.venv\Scripts\scriptorium.exe init `
-  --workspace $Workspace `
-  --provenance-home $ProvenanceHome `
-  --project-id ai4science-pilot `
-  --title "AI4Science Pilot" `
-  --host codex `
-  --idea "Test whether an evidence-traceable agent workflow improves research continuity."
-
-# Apply the same reviewed plan.
-.\.venv\Scripts\scriptorium.exe init `
-  --workspace $Workspace `
-  --provenance-home $ProvenanceHome `
-  --project-id ai4science-pilot `
-  --title "AI4Science Pilot" `
-  --host codex `
-  --idea "Test whether an evidence-traceable agent workflow improves research continuity." `
-  --run
-
-# These commands omit workspace/data flags and use the suite config created by init.
-.\.venv\Scripts\scriptorium.exe host install codex
-.\.venv\Scripts\scriptorium.exe doctor --target public-alpha
-.\.venv\Scripts\scriptorium.exe status
-```
-
-在 `$Workspace` 中打开或重启 Codex，然后发送第一条提示：
+## 产品流程
 
 ```text
-$scriptorium-research Read Projects/ai4science-pilot.md, turn the initial intuition into one falsifiable research question, and propose the smallest evidence-backed next step. Do not write high-value project claims until I approve the exact change.
+本地笔记 / PDF / AI 对话
+        │
+        ▼
+scriptorium init + inventory + migration preview
+        │
+        ▼
+本地项目状态
+        │
+        ├── Provenance：可恢复上下文和本地记忆
+        ├── Steward：文献与资料 handoff
+        └── Spec：组件间共享契约
+        │
+        ▼
+后续 AI 会话从有边界的 context capsule 继续
 ```
 
-回到 PowerShell，先预览本地捕获/同步计划，再显式执行已经审阅的计划：
+核心原则很简单：原始资料、AI 生成草稿、用户确认过的项目记忆必须分开。当前稳定版不要求用户信任不可见的 Agent 内部状态。
+
+## 独立安装组件
+
+查看可用安装 profile：
 
 ```powershell
-.\.venv\Scripts\scriptorium.exe pull
-.\.venv\Scripts\scriptorium.exe pull --run
-.\.venv\Scripts\scriptorium.exe status
+.\.venv\Scripts\scriptorium.exe install --list
 ```
 
-init 默认把套件选择写入 `~/.config/scriptorium/scriptorium/config.toml`；可以用
-`--config-dir` 或 `SCRIPTORIUM_CONFIG_DIR` 选择其他配置族根目录。该配置只保存格式
-版本、workspace 路径、Provenance 数据根路径、所选 hosts 与默认项目。对应路径不存在时，
-init 会创建 `Projects`、`Inbox`、`_planning`、独立的数据根目录和最小项目笔记；
-host adapter 安装、模型访问、hook、网络动作和凭据始终是独立且显式的步骤。
-`doctor` 返回 `1` 表示诊断已经完成、仍有修复指引需要处理，并不表示初始化数据已损坏。
-
-项目笔记默认把 workspace 作为会话归属解析根目录，与上面的命令路径一致。如果 Agent
-会从另一个已经存在的代码仓库运行，请在预览和 `--run` 两次命令中都用
-`--linked-repo` 显式传入该目录。
-
-### 可选的合成集成 demo
-
-如果只想在不使用真实项目的情况下检查组件集成，可以继续运行不需要凭据的 demo：
+只安装 Capture：
 
 ```powershell
-.\.venv\Scripts\scriptorium.exe doctor `
-  --target demo `
-  --spec-root ..\scriptorium-spec `
-  --steward-root ..\steward `
-  --provenance-root ..\Provenance
-
-.\.venv\Scripts\scriptorium.exe demo `
-  --output .\scriptorium-demo `
-  --spec-root ..\scriptorium-spec `
-  --steward-root ..\steward `
-  --provenance-root ..\Provenance
-
-# Choose one supported host; run both commands if both hosts should see the skill:
-.\.venv\Scripts\scriptorium.exe host install codex `
-  --workspace .\scriptorium-demo\workspace
-# .\.venv\Scripts\scriptorium.exe host install claude-code `
-#   --workspace .\scriptorium-demo\workspace
-
-# Preview first; this makes no authoritative data write:
-.\.venv\Scripts\scriptorium.exe pull `
-  --workspace .\scriptorium-demo\workspace `
-  --provenance-home .\scriptorium-demo\provenance `
-  --provenance-root ..\Provenance
-
-# Run the reviewed local plan:
-.\.venv\Scripts\scriptorium.exe pull `
-  --workspace .\scriptorium-demo\workspace `
-  --provenance-home .\scriptorium-demo\provenance `
-  --provenance-root ..\Provenance `
+.\.venv\Scripts\scriptorium.exe install capture `
+  --target D:\Tools\scriptorium-capture `
   --run
 ```
 
-四个仓库相邻且组件命令可发现时，可直接运行：
+安装核心运行组件：
 
 ```powershell
-scriptorium doctor --target demo
-scriptorium demo
+.\.venv\Scripts\scriptorium.exe install core `
+  --target D:\Tools\scriptorium-core `
+  --run
 ```
 
-对带有 Scriptorium demo 标记的目录重复运行在功能上是幂等的；带摄取时间戳的生成记录
-可能不会逐字节一致。非空但没有该标记的目录会被拒绝，不会覆盖用户文件。
+## 文档
 
-## Agent 宿主适配
+- [架构与验收说明](docs/architecture-and-acceptance.zh-CN.md)
+- [合成案例](docs/case-study.zh-CN.md)
+- [展示证据](docs/showcase/README.zh-CN.md)
+- [致谢](ACKNOWLEDGEMENTS.zh.md)
 
-`scriptorium host install` 会把包内唯一的 `scriptorium-research` Agent Skill 投影到
-用户明确选择的现有 workspace。Codex 的目标是
-`.agents/skills/scriptorium-research/SKILL.md`，Claude Code 的目标是
-`.claude/skills/scriptorium-research/SKILL.md`；两者来自同一个 canonical 源，
-不会演化成两套提示词分支。
+## 隐私与安全口径
+
+Scriptorium 默认本地优先。核心流程不要求托管账号，也不会把你的私有研究材料上传。浏览器导出、Zotero、Obsidian 和 PPT 生成都是可选集成。公开样例全部是合成和无害化内容。
+
+项目仍处在早期阶段。对重要工作区请保留备份；涉及写入的命令应先 preview；AI 生成内容应经过人工审查后再作为项目记忆。
+
+## 开发与验证
+
+运行本地测试：
 
 ```powershell
-# Preview only; do not write:
-scriptorium host install codex --workspace D:\Research\MyProject --dry-run
-
-# Install one host; run the second command only when both are needed:
-scriptorium host install codex --workspace D:\Research\MyProject
-scriptorium host install claude-code --workspace D:\Research\MyProject
+.\.venv\Scripts\python.exe -m pytest
 ```
 
-命令要求一个通过 `--workspace`、环境变量或套件配置选定的现有 workspace，绝不会
-隐式回退到当前目录；它拒绝覆盖未托管或已修改内容，拒绝穿越 symlink/junction，
-并在 `.scriptorium/host-adapters.v1.json` 中登记托管 hash，使重复
-安装保持幂等、未被修改的旧官方资产可安全升级。它不会下载软件、登录、启动 GUI、
-安装 hook 或修改全局宿主设置。安装后应在该 workspace 中新开或重启宿主并检查技能
-列表；doctor 验证的是静态文件与匹配 CLI，不代表在线模型或会话内发现已经实测。
-并发安装会通过 workspace 锁 fail closed；若进程崩溃，确认现场后再移除空的
-`.scriptorium/host-install.lock`。
-
-## 按需 pull
-
-两种模式都显式且本地；需要稳定机器报告时增加 `--json`：
+发布前建议至少执行：
 
 ```powershell
-scriptorium pull --workspace D:\Research\Workspace --provenance-home D:\Research\ProvenanceData
-scriptorium pull --workspace D:\Research\Workspace --provenance-home D:\Research\ProvenanceData --run
-scriptorium resume --provenance-home D:\Research\ProvenanceData --project my-project
+.\.venv\Scripts\scriptorium.exe doctor
+.\.venv\Scripts\scriptorium.exe install --list
 ```
 
-两个路径都必须已经存在；Scriptorium 永不把当前目录隐式当作项目数据根。已登记的
-canonical Codex adapter 会启用保守的本地日志扫描（只收已登记项目、最近且稳定的日志、
-排除 Desktop）。安装 Claude Code skill 不等于其可选 `SessionEnd` enqueue hook 已安装或
-完成 live 验证；该捕获路径仍需用户单独显式配置。`--project` 只收窄 Codex 发现范围，
-workspace 摄取和已有同步队列仍是 workspace-wide。
+## 许可证
 
-如果报告出现 `project-resolution`，对应事件会继续保留在受保护的 inflight 状态；
-Scriptorium 不会为未解析项目生成摘要、timeline 或 draft。请在 Markdown workspace 中
-批准或补充正确的 `project_id` / `linked_repo` 映射，再次 pull 后会继续原事件而不是将其
-退休。canonical 项目 Skill（目录为兼容旧版本保留 `scriptorium-research` 名称）通过
-默认隐藏路径的只读 `prov-sync-unresolved` 检查未解析事件。出现 `agent-fill` 时，它只通过
-`prov-sync-pending` 读取白名单化的已净化 scaffold，
-并只通过 `prov-sync-fill` 提交用户批准的候选 fill；不会拼接受保护路径或直接写
-`fill.json`。提交 fill 与后续执行权威 `--run` 需要分别授权。
-
-退出码 `0` 包括成功预览/执行和正常的 `action-required` 待办；`1` 表示安全阻断或部分
-阶段失败；`2` 表示入口无法形成可信报告。pull 报告按设计只包含聚合信息：组件原始输出、
-本地路径、会话标识和项目正文都会在入口边界被抑制。
-
-## 就绪度诊断
-
-默认 target 检查完整产品边界：
-
-```powershell
-scriptorium doctor `
-  --workspace .\scriptorium-demo\workspace `
-  --provenance-home .\scriptorium-demo\provenance
-scriptorium doctor --json `
-  --workspace .\scriptorium-demo\workspace `
-  --provenance-home .\scriptorium-demo\provenance
-```
-
-所选 target 没有必需项失败时返回 `0`；诊断成功但缺少必需项时返回 `1`；只有 doctor
-自身无法形成可信报告时才返回 `2`。Zotero、Obsidian、PowerPoint、Lectern 或浏览器
-扩展缺失，只会降级对应能力。Agent 登录、浏览器扩展权限、GUI 启动、workspace 写入
-与真实网络行为均明确标为未测试。检测到应用或命令，不等于对应 live integration、
-provider 或真实产出已经验证。Public Alpha 的 workspace 证据至少要求一个带完整
-`project/1.x` frontmatter 的 `Projects/*.md` 笔记；普通仓库 README 不会被误判为
-Scriptorium workspace。`entry.pull` 只有在兼容的机器可读能力探针通过时才通过。Public Alpha
-还要求兼容的 `prov-ingest-research` 与 `prov-context` 命令，并探测真实 Context Capsule
-运行时版本。Codex 是当前第一条
-可执行会话捕获路径；仅安装 Claude 的配置在其 opt-in `SessionEnd` hook 完成 live 验证前，
-仍会被诚实标为人工就绪项。
-
-## 套件工作流状态
-
-`init` 完成后，日常命令可以直接读取套件配置，不再重复输入路径：
-
-```powershell
-scriptorium status
-scriptorium status --json
-```
-
-该命令是不暴露内容的聚合，不代表同步授权。它会报告 Public Alpha 就绪度、可选的
-Literature / Slides / Web-history 能力、基于当前 pull 预览的 freshness、聚合待办计数
-和有序审阅提示。`review-pull-plan` 用于打开普通预览；阻塞或错误结果中的
-`pull-diagnostics` 会重新进入同一个不暴露内容的公共诊断入口，两者都只指向普通
-`scriptorium pull`。用户必须在独立预览中确认计划，之后才能另行显式增加 `--run`。
-项目解析、Agent fill、人工审批与 workspace 审阅仍是人机协作提示，不会伪装成能
-自动完成这些动作的命令。
-
-`ready` 与 `attention` 返回 0，使正常人工审核待办不会被误判成基础设施故障；
-`incomplete` 或 `blocked` 返回 1。可信 pull 预览报告错误，或入口无法形成可信报告时，
-`error` 返回 2。在组件提供稳定契约前，最近一次成功 pull 时间会诚实标为
-`not-reported`；命令不会自创“超过 N 天”阈值，也不会解析旧的 Provenance 人类可读
-status 输出。
-
-## 产物结构
-
-```text
-scriptorium-demo/
-├── fixtures/                         # 明确标注的合成输入
-├── workspace/
-│   ├── Projects/                     # project/1.x Markdown
-│   ├── Reviews/                      # Steward 组装的综述
-│   └── Reports/                      # Provenance 检索与 MCP 证据
-├── provenance/
-│   ├── memory/                       # 隔离的文献/项目快照
-│   └── search-index.db               # 隔离的本地 FTS5 索引
-└── demo-report.json                  # 阶段、断言、边界和产物
-```
-
-所有子进程的 `PROVENANCE_HOME`、`PROVENANCE_VAULT`、临时目录与配置主目录
-都被重定向到 demo 目录。子进程只继承最小环境白名单，不继承用户的模型、Zotero
-或 provider 凭据。入口自身不含网络客户端；操作系统级网络/文件写入探针仍属于
-发布加固项，当前报告不会假装已经观测到它们。
-
-## 当前兼容基线
-
-- `scriptorium-spec` 2.3.0
-- Steward 0.2.0
-- Provenance 0.18.0
-
-当前 V0.2 候选版将以上版本作为协同兼容基线，并在 demo 与 CI 中继续固定精确组件
-提交。版本范围兼容策略暂不靠猜测定义，而是在获得外部 Alpha 使用证据后再确定。
-
-## 紧邻的产品增量
-
-1. 在全新的远端 Windows CI 与隔离用户环境中复跑当前迁移、安装生命周期和幻灯片交接门禁后，再升级其发布状态；
-2. 提交稳定 Spec 与 Provenance 候选，把最终提交号回填到组件目录，再按这些精确版本复跑干净安装；
-3. 用同一合成项目验证真实 Codex 与 Claude Code 会话；
-4. 开展外部用户 Alpha，用实测结果决定安装打包与兼容版本范围。
-
-Apache-2.0，无遥测。
+Apache-2.0。见 [LICENSE](LICENSE)。

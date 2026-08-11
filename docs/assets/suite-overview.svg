@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640" role="img" aria-labelledby="title desc">
+  <title id="title">Scriptorium suite overview</title>
+  <desc id="desc">Scriptorium connects people, AI agents, sources, project memory, and deliverables through a local-first control layer.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1"><stop offset="0" stop-color="#0f172a"/><stop offset="1" stop-color="#1e293b"/></linearGradient>
+    <linearGradient id="accent" x1="0" x2="1"><stop offset="0" stop-color="#38bdf8"/><stop offset="1" stop-color="#a78bfa"/></linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%"><feDropShadow dx="0" dy="12" stdDeviation="18" flood-color="#020617" flood-opacity="0.35"/></filter>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth"><path d="M2,2 L10,6 L2,10 Z" fill="#a78bfa"/></marker>
+    <style>
+      .title{font:700 44px ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif;fill:#f8fafc}.subtitle{font:500 20px ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif;fill:#cbd5e1}.label{font:700 22px ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif;fill:#e2e8f0}.body{font:500 16px ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif;fill:#cbd5e1}.small{font:600 13px ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif;fill:#94a3b8}.box{fill:#111827;stroke:#334155;stroke-width:1.5;rx:22;filter:url(#shadow)}.core{fill:#172554;stroke:#38bdf8;stroke-width:2;rx:28;filter:url(#shadow)}.chip{fill:#0f172a;stroke:#475569;stroke-width:1;rx:16}.arrow{stroke:url(#accent);stroke-width:4;fill:none;stroke-linecap:round;stroke-linejoin:round;marker-end:url(#arrow)}
+    </style>
+  </defs>
+  <rect width="1280" height="640" fill="url(#bg)"/>
+  <text x="70" y="78" class="title">Scriptorium</text>
+  <text x="70" y="112" class="subtitle">A local-first, model-neutral control layer for long-running knowledge work.</text>
+  <rect x="70" y="170" width="250" height="128" class="box"/><text x="100" y="215" class="label">People</text><text x="100" y="248" class="body">Goals, judgment, approval</text><text x="100" y="274" class="small">the user stays in control</text>
+  <rect x="70" y="348" width="250" height="128" class="box"/><text x="100" y="393" class="label">AI agents</text><text x="100" y="426" class="body">Codex, Claude Code, local tools</text><text x="100" y="452" class="small">replaceable clients</text>
+  <rect x="410" y="210" width="460" height="220" class="core"/><text x="460" y="265" class="label">Project control layer</text><text x="460" y="302" class="body">Initializes workspaces, imports sources, resumes context,</text><text x="460" y="328" class="body">coordinates components, and preserves reviewable state.</text>
+  <rect x="460" y="360" width="120" height="38" class="chip"/><text x="489" y="384" class="small">Scriptorium</text><rect x="600" y="360" width="112" height="38" class="chip"/><text x="632" y="384" class="small">Spec</text><rect x="732" y="360" width="98" height="38" class="chip"/><text x="754" y="384" class="small">Profiles</text>
+  <rect x="960" y="126" width="250" height="102" class="box"/><text x="990" y="168" class="label">Sources</text><text x="990" y="199" class="body">Markdown, PDFs, chats, Zotero</text>
+  <rect x="960" y="268" width="250" height="102" class="box"/><text x="990" y="310" class="label">Project memory</text><text x="990" y="341" class="body">Provenance context + trace</text>
+  <rect x="960" y="410" width="250" height="102" class="box"/><text x="990" y="452" class="label">Deliverables</text><text x="990" y="483" class="body">Summaries, handoffs, slides</text>
+  <path d="M320 234 C360 234 372 278 410 292" class="arrow"/><path d="M320 412 C360 412 372 362 410 348" class="arrow"/><path d="M870 282 C912 248 920 194 960 176" class="arrow"/><path d="M870 320 L960 320" class="arrow"/><path d="M870 360 C912 382 920 438 960 462" class="arrow"/>
+  <text x="70" y="574" class="small">Local-first by default · File contracts over private APIs · Evidence before claims · Components remain independently usable</text>
+</svg>
