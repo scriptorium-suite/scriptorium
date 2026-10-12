@@ -1,8 +1,8 @@
 # Scriptorium 架构、使用与分层验收说明
 
-> 文档状态：开发验收说明，依据 2026-07-23 的公开代码工作区编写。
+> 文档状态：开发验收说明，依据 2026-07-26 的公开代码工作区编写。
 >
-> 当前已发布的 umbrella 基线仍是 Public Alpha v0.1.0；工作树正在形成 V0.2.0 候选版。本文中的 V0.2、V0.3、V0.4 是分层验收目标，不等同于已经发布。
+> 当前已发布的 umbrella 基线仍是 Public Alpha v0.1.0；工作树包含尚未发布的 V0.2.0 候选基线与尚未提交的 V0.3 增量。本文中的 V0.2、V0.3、V0.4 是分层验收目标，不等同于已经发布。
 
 ## 1. 一句话理解这个产品
 
@@ -16,10 +16,11 @@
 - 关键写入先预览、再确认，必要时可以回滚；
 - Codex、Claude Code 或其他 Agent 可以更换，项目状态仍留在本地文件和版本化契约中。
 
-“实验进入项目状态”是产品方向。`experiment-run/1.0` 与 `claim-evidence/1.0`
-已经作为正式文件契约存在，但当前还没有运行登记命令、持久化与查询路径、结果与 Claim
-的关联，也没有统一执行器接口。现阶段实验仍由用户在 Jupyter、Python 或领域软件中运行，
-再把经过审阅的结果接回项目。
+“实验进入项目状态”仍是产品方向。`experiment-run/1.0` 与 `claim-evidence/1.0`
+已经作为正式文件契约存在；尚未提交的 V0.3 候选工作树也已加入 Evidence 目录初始化、
+Provenance 候选导入命令和本地派生 registry。它仍没有统一执行器、本地人工审批与正式
+晋升、公共查询或 Context Capsule 0.2。现阶段实验仍由用户在 Jupyter、Python 或领域
+软件中运行，候选记录进入 registry 也不代表其中的科学结论已经成立。
 
 ## 2. 各组件分别做什么
 
@@ -219,13 +220,23 @@ scriptorium pull --project <project-id> --run --json
 1. 从 Context Capsule 和项目笔记中选出一个可证伪问题；
 2. 在隔离的 Jupyter、Python 或领域软件环境运行最小实验；
 3. 保存代码、输入版本、参数、随机种子、日志和输出文件；
-4. 对关键数字做独立复算；
-5. 由研究者审阅后，把结论、限制和下一步写回项目。
+4. 在 `Evidence/Runs/` 记录实际运行，在 `Evidence/Claims/pending/` 只创建待审
+   `claim-evidence/1.x`，并显式关联 run、locator、artifact ID 与声明的 SHA-256；
+5. 先运行 Provenance 零写入预览，向研究者展示精确 `plan_id`、计划 ID 和聚合变化；
+   只在研究者批准该计划后，以相同输入和 `--run --plan-id <preview-plan-id>` 写入本地
+   派生 registry。来源或 registry 变化时必须重新预览；
+6. 对关键数字与真实 artifact 字节做独立复核；在正式审批能力完成前，不把候选 Claim
+   写回项目正式状态。
 
-**尚未完成：**对 `experiment-run/1.0` 的运行登记、持久化和查询，对
-`claim-evidence/1.0` 的人工审阅与 Claim 关联，以及失败实验的可检索经验库。两个 Schema
-只定义跨组件交换形状；因此“脚本成功退出”目前不能被 Scriptorium 自动解释为
-“科学结论成立”。
+**当前候选实现：**初始化会创建 `Evidence/Runs/`、`Evidence/Claims/pending/` 和
+`Evidence/Claims/reviewed/`；正式 1.x 契约可以被 Provenance 验证并以 exact
+`plan_id` 授权导入。运行记录与 Claim 的引用关系、失败运行、本地派生 registry、
+fingerprint、身份一致性、隐私脱敏和防篡改 loader 已通过本地合成复审。生产者声称
+accepted 的 Claim 仍会被强制降为本地未信任候选。
+
+**尚未完成：**本地人工审批界面、从真实 artifact 字节重算 SHA-256、已审 Claim 的
+正式晋升、registry 的对外只读查询与 Context Capsule 0.2。当前补丁还没有新的远端 CI
+证据。因此“脚本成功退出”或“候选导入成功”都不能被解释为“科学结论成立”。
 
 ### 4.7 生成汇报 PPT
 
@@ -290,9 +301,14 @@ V0.3 应在 V0.2 基础上新增三条可验收能力：
    - 每个关键结论能回到来源或明确标为推测。
 
 当前判断：安全迁移 CLI 与 Lectern 跨仓合成 E2E 已在开发工作区通过；
-`experiment-run/1.0` 与 `claim-evidence/1.0` 正式契约也已存在，但 umbrella 与
-Provenance 尚未接入运行登记、持久化、查询和 Claim 关联，远端 Windows CI 也还没有运行。
-因此 V0.3 目前仍不能整体验收通过。
+`experiment-run/1.0` 与 `claim-evidence/1.0` 正式契约、Evidence 目录初始化，以及
+Provenance 的零写入预览、exact `plan_id` 授权、候选关联和本地派生 registry 也已在
+尚未提交的 V0.3 候选工作树通过合成、隐私与防篡改复审。
+
+尚缺的阻断项是：本地人工审批与正式晋升、从真实 artifact 字节重算 SHA-256、registry
+的公共只读查询与 Context Capsule 0.2、当前补丁的远端 Windows CI，以及外部用户 Alpha。
+因此 V0.3 目前仍不能整体验收通过，更不能据此声称任何科学结论已经验证；V0.4 也没有
+发布或完成。
 
 ### 5.3 V0.4：证明“别人能在 Windows 上独立用起来”
 

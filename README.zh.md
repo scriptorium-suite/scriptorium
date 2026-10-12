@@ -7,10 +7,12 @@
 > Claude Code 技能安装器。已确认的按需入口 `scriptorium pull` 与有边界、只读的
 > `scriptorium resume` Context Capsule 均通过 Provenance 的机器可读公共命令交付。
 > 经过安全复审的 `scriptorium migrate` CLI 已作为 V0.3 候选能力加入，但不代表
-> V0.3 已经发布或验收完成。
+> V0.3 已经发布或验收完成。同一份尚未提交的候选工作树还会初始化规范的 `Evidence/`
+> 目录，并包含正式的 `experiment-run/1.0`、`claim-evidence/1.0` 契约及 Provenance
+> 受精确计划约束的候选导入路径。
 > 已发布基线具有 GitHub-hosted Windows 证据；当前工作树也已在本地通过合成迁移、
 > 安装、卸载、重装、v0.1.0 到当前候选版的版本切换，以及 Steward-to-Lectern
-> 检查，但仍需重新运行远端 CI。Agent host 实时
+> 和 Evidence 候选导入、隐私/防篡改检查，但仍需重新运行远端 CI。Agent host 实时
 > 对等路径和真实 provider 幻灯片生成仍是人工 Alpha 门槛。
 
 Scriptorium 是面向科研工作者的本地优先、Agent 原生研究工作流套件。本仓库是
@@ -112,10 +114,25 @@ Linux `renameat2(RENAME_NOREPLACE)`；其他平台不降级执行。
 报告只含聚合计数与状态。迁移只复制
 文件，不会解析、索引、批准科研内容，也不会自动导入 Provenance。
 
+尚未提交的 V0.3 候选实现还会在项目初始化时创建 `Evidence/Runs/`、
+`Evidence/Claims/pending/` 与 `Evidence/Claims/reviewed/`。Provenance 只验证用户
+显式选择的 `experiment-run/1.x` 和 `claim-evidence/1.x` 文件，先返回包含精确
+`plan_id` 与聚合变化的零写入预览；真正写入必须对同一批输入使用
+`--run --plan-id <preview-plan-id>`，来源或 registry 一旦变化，旧计划立即失效。
+生产者标记为 accepted 的 Claim 仍会被强制保存为本地未信任候选，进入可重建的派生
+registry；严格 fingerprint、身份一致性、路径/凭据脱敏与 fail-closed loader 已通过
+本地隐私和防篡改复审。这只证明候选导入边界存在，不代表人工审批或科学验证完成：
+套件尚不能根据真实 artifact 字节重算 SHA-256、正式晋升已审 Claim、通过公共接口查询
+registry，或把它纳入 Context Capsule 0.2。
+
 ## Windows 源码快速体验
 
 前置条件：Git 与 Python 3.11+。先把四个仓库克隆到同一个父目录，使源码发现
 路径明确且可复现：
+
+不要混用任意分支。正式发布后应使用彼此匹配的 release tag；在当前候选 PR
+评审期间，应使用 `.github/workflows/ci.yml` 固定的各组件完整提交。依赖仓候选合并前，
+浮动 `main` 仍可能是上一版本。
 
 ```powershell
 mkdir scriptorium-workspace
@@ -132,11 +149,20 @@ python -m venv .venv
 # Install the two runtime components into the same isolated environment:
 .\.venv\Scripts\python.exe -m pip install --no-deps -e ..\steward
 .\.venv\Scripts\python.exe -m pip install --no-deps -e ..\Provenance
+
+# 保持这个 PowerShell 窗口。由它启动的 Agent 会继承同一个 CLI 环境。
+$SuiteScripts = (Resolve-Path .\.venv\Scripts).Path
+$env:PATH = "$SuiteScripts;$env:PATH"
+scriptorium --version
+steward --version
+prov-context --version
 ```
 
 根据本地 Python 环境，editable 安装可能访问已配置的包索引以取得
 `setuptools>=68` 等声明的构建依赖。“运行期不申请网络动作”只适用于源码安装完成后，
 不代表离线安装保证。
+canonical Agent Skill 调用的是裸 `scriptorium` 命令。如果之后打开新终端，需要再次把
+同一个 venv `Scripts` 目录加入 `PATH`，再启动 Codex 或 Claude Code。
 
 ### 可选：预览已有本地资料
 
@@ -233,18 +259,47 @@ $ProvenanceHome = Join-Path $HOME "Research\scriptorium-data"
 .\.venv\Scripts\scriptorium.exe status
 ```
 
-在 `$Workspace` 中打开或重启 Codex，然后发送第一条提示：
+从同一个 PowerShell 启动 Codex，确保它继承套件 CLI，然后发送第一条提示：
+
+```powershell
+Push-Location $Workspace
+Get-Command scriptorium
+codex
+```
 
 ```text
 $scriptorium-research Read Projects/ai4science-pilot.md, turn the initial intuition into one falsifiable research question, and propose the smallest evidence-backed next step. Do not write high-value project claims until I approve the exact change.
 ```
 
-回到 PowerShell，先预览本地捕获/同步计划，再显式执行已经审阅的计划：
+结束 Agent 任务并回到 PowerShell。保守的 Codex 扫描器只接收日志已经连续 300 秒
+不再变化的会话；等待最多约 5 分钟后，先预览本地捕获/同步计划，再只执行你已经审阅的
+计划：
 
 ```powershell
-.\.venv\Scripts\scriptorium.exe pull
-.\.venv\Scripts\scriptorium.exe pull --run
-.\.venv\Scripts\scriptorium.exe status
+scriptorium pull
+scriptorium pull --run
+scriptorium status
+```
+
+出现 `action-required` 是正常的审阅门禁：
+
+1. 若为 `agent-fill`，恢复原来的 Agent 任务，让 `$scriptorium-research` 读取待处理的
+   脱敏 scaffold 并提出准确 fill；明确批准该 fill 后，再次 preview 并运行
+   `scriptorium pull`。
+2. 若为 `human-approval`，打开 `$Workspace\Approvals.md`，审阅或修改目标候选，只勾选
+   对应条目，不要使用整体批准。保存后先运行 `scriptorium pull` 预览；确认计划无误后，
+   再单独授权 `scriptorium pull --run`。
+3. 最后执行 `scriptorium resume --project ai4science-pilot --json`。Capsule 应包含已经
+   批准的状态与低风险进展，不得包含原始对话、待填内容、被拒绝草稿或本地路径。
+
+若要验收跨宿主恢复，可为第二个 host 安装同一份 canonical Skill，从这个已经配置 PATH
+的终端在 `$Workspace` 中启动它，并让它恢复同一项目。安装 Skill 不会安装 Agent 本身：
+
+```powershell
+scriptorium host install claude-code
+scriptorium resume --project ai4science-pilot --json
+claude
+Pop-Location
 ```
 
 init 默认把套件选择写入 `~/.config/scriptorium/scriptorium/config.toml`；可以用
@@ -438,9 +493,9 @@ scriptorium-demo/
 
 ## 紧邻的产品增量
 
-1. 在全新的远端 Windows CI 与隔离用户环境中复跑当前迁移、安装生命周期和幻灯片交接门禁后，再升级其发布状态；
-2. 将已批准的 `experiment-run/1.0` 契约接入本地运行登记、持久化和查询，保留失败运行，但不把计算引擎内置进套件；
-3. 将 `claim-evidence/1.0` 接入验证、人工审阅，以及运行证据与候选 Claim 的显式关联；
+1. 在全新的远端 Windows CI 中复跑当前迁移、安装生命周期、Evidence 导入、隐私和幻灯片交接门禁后，再升级尚未提交候选版的发布状态；
+2. 建立本地人工审阅边界：从真实 artifact 字节重算 SHA-256，并在不改写来源契约的前提下显式晋升已批准 Claim；
+3. 为已审运行与候选提供有边界的只读查询和 Context Capsule 0.2，同时继续把未审批 Claim 标为非权威内容；
 4. 验证 Lectern 真实 provider 输出，以及 Claude Code `SessionEnd` 与 Codex 捕获路径的实时对等性；
 5. 开展外部用户 Alpha，用实测结果决定安装打包与兼容版本范围。
 

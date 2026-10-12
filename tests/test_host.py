@@ -96,6 +96,46 @@ class HostInstallTests(unittest.TestCase):
         self.assertIn("separate authorization", payload)
         self.assertIn("do not create or fill a session summary", payload)
 
+    def test_canonical_skill_wires_the_evidence_candidate_boundary(self):
+        payload = host_module._load_skill().decode("utf-8")
+
+        for required in (
+            "`Evidence/Runs/`",
+            "`Evidence/Claims/pending/`",
+            "`Evidence/Claims/reviewed/`",
+            "`review_state: draft`",
+            "`source_id`",
+            "`artifact_id`",
+            "`sha256`",
+            "`locator`",
+            "A succeeded run",
+            "not an accepted or scientifically supported Claim",
+            "Never write to",
+            "Never",
+            "tick an approval checkbox",
+            "schema validator",
+            "zero-write preview",
+            "`prov-ingest-evidence <explicit-inputs> --json`",
+            "exact `plan_id`",
+            "aggregate `added`, `updated`, and `total`",
+            "planned `run_id` and `claim_id`",
+            "authorize only that exact plan",
+            "--run --plan-id <preview-plan-id>",
+            "`plan-mismatch`",
+            "request a new authorization",
+            "Never reuse an old `plan_id`",
+        ):
+            self.assertIn(required, payload)
+        preview = payload.index(
+            "`prov-ingest-evidence <explicit-inputs> --json`"
+        )
+        approval = payload.index("authorize only that exact plan")
+        execution = payload.index("--run --plan-id <preview-plan-id>")
+        repreview = payload.index("rerun the zero-write preview")
+        self.assertLess(preview, approval)
+        self.assertLess(approval, execution)
+        self.assertLess(execution, repreview)
+
     def test_repeat_install_is_unchanged_and_does_not_rewrite(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

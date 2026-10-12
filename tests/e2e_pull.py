@@ -791,6 +791,19 @@ def run_e2e(provenance_root: Path) -> None:
         )
         require(project_note.is_file(), "Public init omitted the project note")
         require(config_path.is_file(), "Public init omitted the suite config")
+        for evidence_directory in (
+            workspace / "Evidence" / "Runs",
+            workspace / "Evidence" / "Claims" / "pending",
+            workspace / "Evidence" / "Claims" / "reviewed",
+        ):
+            require(
+                evidence_directory.is_dir(),
+                "Public init omitted the canonical Evidence directory layout",
+            )
+        require(
+            not (workspace / "Evidence" / "Evidence-Approvals.md").exists(),
+            "Public init created an unratified Evidence approval surface",
+        )
         initialized_project = project_note.read_bytes()
         initialized_config = config_path.read_bytes()
         initialized_tree = snapshot_tree(base)

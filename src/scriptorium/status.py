@@ -58,6 +58,38 @@ ACTION_ORDER = (
     "pull-diagnostics",
     "review-pull-plan",
 )
+ACTION_GUIDANCE = {
+    "doctor-remediation": (
+        "Run the listed doctor command and review its local-only diagnostics."
+    ),
+    "codex-home-setup": (
+        "Configure a supported local Codex profile, then rerun scriptorium status."
+    ),
+    "project-resolution": (
+        "Use $scriptorium-research to inspect unresolved items and confirm the project "
+        "mapping, then rerun scriptorium pull."
+    ),
+    "agent-fill": (
+        "Resume the originating Agent session, use $scriptorium-research to review "
+        "pending scaffolds, and approve a fill before rerunning scriptorium pull."
+    ),
+    "human-approval": (
+        "Open Approvals.md in the configured workspace, review and check only the "
+        "intended entries, then preview scriptorium pull before separately "
+        "authorizing application."
+    ),
+    "workspace-review": (
+        "Wait for active Agent logs to become stable and review draft-only workspace "
+        "items before rerunning scriptorium pull."
+    ),
+    "pull-diagnostics": (
+        "Run scriptorium pull in preview mode and review its content-free diagnostics."
+    ),
+    "review-pull-plan": (
+        "Run scriptorium pull in preview mode and review the plan before separately "
+        "authorizing application."
+    ),
+}
 SUMMARY_ACTION_FIELDS = {
     "project-resolution": ("unresolved_events",),
     "agent-fill": ("pending_fill",),
@@ -251,7 +283,11 @@ def _actions(
         count = counts.get(action_type, 0)
         if not count:
             continue
-        action = {"type": action_type, "count": count}
+        action = {
+            "type": action_type,
+            "count": count,
+            "guidance": ACTION_GUIDANCE[action_type],
+        }
         if action_type == "doctor-remediation":
             action["command"] = "scriptorium doctor"
         elif action_type in {"pull-diagnostics", "review-pull-plan"}:
@@ -409,6 +445,11 @@ def format_status_report(report: dict[str, Any]) -> str:
         and isinstance(item.get("count"), int)
         and not isinstance(item.get("count"), bool)
     ]
+    next_steps = [
+        f"Next: {item['type']}: {ACTION_GUIDANCE[item['type']]}"
+        for item in report.get("action_required", [])
+        if isinstance(item, dict) and item.get("type") in ACTION_GUIDANCE
+    ]
     lines = [
             f"Scriptorium status {report['generated_by']['version']}",
             f"Overall: {str(report['status']).upper()}",
@@ -437,4 +478,5 @@ def format_status_report(report: dict[str, Any]) -> str:
             "suppressed; external probe side effects not OS-observed",
         ]
     )
+    lines.extend(next_steps)
     return "\n".join(lines)

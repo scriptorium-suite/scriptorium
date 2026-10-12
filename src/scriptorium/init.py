@@ -41,7 +41,16 @@ _YAML_NUMBER = re.compile(
 _YAML_DATE = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}(?:[Tt ].*)?")
 PROGRESS_BEGIN = "<!-- scriptorium:progress-log:begin -->"
 PROGRESS_END = "<!-- scriptorium:progress-log:end -->"
-WORKSPACE_DIRECTORIES = ("Projects", "Inbox", "_planning")
+WORKSPACE_DIRECTORIES = (
+    "Projects",
+    "Inbox",
+    "_planning",
+    "Evidence",
+    "Evidence/Runs",
+    "Evidence/Claims",
+    "Evidence/Claims/pending",
+    "Evidence/Claims/reviewed",
+)
 CONFIG_REPORT_PATH = str(CONFIG_RELATIVE_PATH).replace("\\", "/")
 
 
@@ -1063,12 +1072,19 @@ def _bound_directory(path: Path):
         binding.close()
 
 
-def _bound_child_directory(binding: _DirectoryBinding, leaf: str) -> int:
-    if binding.leaf is None or not leaf or PurePath(leaf).name != leaf:
+def _bound_child_directory(
+    binding: _DirectoryBinding, leaf: str, *, parent: int | None = None
+) -> int:
+    parent_descriptor = binding.leaf if parent is None else parent
+    if (
+        parent_descriptor is None
+        or not leaf
+        or PurePath(leaf).name != leaf
+    ):
         raise InitError("invalid managed directory leaf")
     descriptor = (
         _nt_open_relative(
-            binding.leaf,
+            parent_descriptor,
             leaf,
             directory=True,
             create=True,
@@ -1076,7 +1092,7 @@ def _bound_child_directory(binding: _DirectoryBinding, leaf: str) -> int:
             share=_WINDOWS_DIRECTORY_SHARE,
         )
         if os.name == "nt"
-        else _posix_open_child_directory(binding.leaf, leaf, create=True)
+        else _posix_open_child_directory(parent_descriptor, leaf, create=True)
     )
     binding.entries.append(descriptor)
     return descriptor
@@ -1444,6 +1460,29 @@ def _assert_binding_current(binding: _DirectoryBinding) -> None:
         raise InitError("managed directory path identity changed")
 
 
+def _assert_managed_directory_current(path: Path, descriptor: int) -> None:
+    """Verify that a held nested directory is still published at its planned path."""
+    if os.name == "nt":
+        check = _win_open_anchor(path)
+        try:
+            if _win_identity(_win_info(check)) != _win_identity(_win_info(descriptor)):
+                raise InitError("managed directory path identity changed")
+        finally:
+            _win_close(check)
+        return
+    try:
+        current = os.stat(path, follow_symlinks=False)
+        held = os.fstat(descriptor)
+    except OSError as exc:
+        raise InitError("managed directory path identity changed") from exc
+    if (
+        stat.S_ISLNK(current.st_mode)
+        or not stat.S_ISDIR(current.st_mode)
+        or not _same_identity(current, held)
+    ):
+        raise InitError("managed directory path identity changed")
+
+
 def run_init(
     *,
     workspace: Path,
@@ -1588,6 +1627,36 @@ def run_init(
             projects = _bound_child_directory(workspace_binding, "Projects")
             _bound_child_directory(workspace_binding, "Inbox")
             _bound_child_directory(workspace_binding, "_planning")
+            evidence = _bound_child_directory(workspace_binding, "Evidence")
+            evidence_runs = _bound_child_directory(
+                workspace_binding, "Runs", parent=evidence
+            )
+            evidence_claims = _bound_child_directory(
+                workspace_binding, "Claims", parent=evidence
+            )
+            evidence_pending = _bound_child_directory(
+                workspace_binding, "pending", parent=evidence_claims
+            )
+            evidence_reviewed = _bound_child_directory(
+                workspace_binding, "reviewed", parent=evidence_claims
+            )
+            evidence_directories = (
+                (resolved_workspace / "Evidence", evidence),
+                (resolved_workspace / "Evidence" / "Runs", evidence_runs),
+                (resolved_workspace / "Evidence" / "Claims", evidence_claims),
+                (
+                    resolved_workspace / "Evidence" / "Claims" / "pending",
+                    evidence_pending,
+                ),
+                (
+                    resolved_workspace / "Evidence" / "Claims" / "reviewed",
+                    evidence_reviewed,
+                ),
+            )
+
+            def verify_managed_directories() -> None:
+                for path, descriptor in evidence_directories:
+                    _assert_managed_directory_current(path, descriptor)
 
             # The project is authoritative. Publish or revalidate it before the
             # suite config becomes the final discovery marker.
@@ -1625,6 +1694,7 @@ def run_init(
                         )
 
                 verify_project_file()
+                verify_managed_directories()
                 _assert_binding_current(workspace_binding)
                 _assert_binding_current(home_binding)
                 _assert_binding_current(config_binding)
@@ -1632,6 +1702,7 @@ def run_init(
                 if config_change["action"] == "create":
                     def verify_discovery_roots() -> None:
                         verify_project_file()
+                        verify_managed_directories()
                         _assert_binding_current(workspace_binding)
                         _assert_binding_current(home_binding)
                         _assert_binding_current(config_binding)
@@ -1647,6 +1718,7 @@ def run_init(
                     )
                 else:
                     verify_project_file()
+                    verify_managed_directories()
                     try:
                         current_config = _config_from_bytes(
                             _read_bound_file(config_binding.leaf, config_path.name)

@@ -106,7 +106,14 @@ class StatusTests(unittest.TestCase):
         self.assertEqual(report["exit_code"], 0)
         self.assertEqual(report["freshness"]["state"], "review-required")
         self.assertIn(
-            {"type": "codex-home-setup", "count": 1},
+            {
+                "type": "codex-home-setup",
+                "count": 1,
+                "guidance": (
+                    "Configure a supported local Codex profile, then rerun "
+                    "scriptorium status."
+                ),
+            },
             report["action_required"],
         )
 
@@ -129,6 +136,10 @@ class StatusTests(unittest.TestCase):
                 {
                     "type": "review-pull-plan",
                     "count": 1,
+                    "guidance": (
+                        "Run scriptorium pull in preview mode and review the plan "
+                        "before separately authorizing application."
+                    ),
                     "command": "scriptorium pull",
                 }
             ],
@@ -178,6 +189,17 @@ class StatusTests(unittest.TestCase):
         self.assertIsNone(commands["agent-fill"])
         self.assertIsNone(commands["human-approval"])
         self.assertIsNone(commands["workspace-review"])
+        guidance = {
+            item["type"]: item["guidance"]
+            for item in report["action_required"]
+        }
+        self.assertIn("$scriptorium-research", guidance["agent-fill"])
+        self.assertIn("Approvals.md", guidance["human-approval"])
+        self.assertIn("logs to become stable", guidance["workspace-review"])
+
+        rendered = format_status_report(report)
+        self.assertIn("Next: agent-fill:", rendered)
+        self.assertIn("Approvals.md", rendered)
 
     def test_incomplete_readiness_skips_pull(self):
         report, pull_mock = self.run_with(doctor_report(ready=False))
@@ -216,6 +238,10 @@ class StatusTests(unittest.TestCase):
             {
                 "type": "pull-diagnostics",
                 "count": 1,
+                "guidance": (
+                    "Run scriptorium pull in preview mode and review its "
+                    "content-free diagnostics."
+                ),
                 "command": "scriptorium pull",
             },
         )

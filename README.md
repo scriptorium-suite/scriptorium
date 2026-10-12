@@ -9,10 +9,13 @@
 > the accepted on-demand `scriptorium pull` entry and bounded, read-only
 > `scriptorium resume` Context Capsule through Provenance's machine-readable
 > public commands. A safety-reviewed `scriptorium migrate` CLI is included as a
-> V0.3 candidate, not as a completed V0.3 release. The previously published baseline
-> has GitHub-hosted Windows evidence; this worktree also has local synthetic migration,
-> install/uninstall/reinstall, v0.1.0-to-current version-transition, and
-> Steward-to-Lectern checks, but still needs fresh remote CI.
+> V0.3 candidate, not as a completed V0.3 release. The same uncommitted candidate
+> worktree initializes the canonical `Evidence/` directories and includes the formal
+> `experiment-run/1.0` and `claim-evidence/1.0` contracts plus Provenance's
+> plan-bound candidate-ingest path. The previously published baseline has GitHub-hosted
+> Windows evidence; this worktree also has local synthetic migration,
+> install/uninstall/reinstall, v0.1.0-to-current version-transition, evidence-ingest,
+> privacy/tamper-review, and Steward-to-Lectern checks, but still needs fresh remote CI.
 > Live Agent-host parity and real-provider slide generation remain manual Alpha gates.
 
 Scriptorium is a local-first, agent-native research workflow suite. This repository
@@ -143,10 +146,28 @@ is exposed. Terminal
 and JSON reports contain aggregate counts and states only. This command copies
 files—it does not parse, index, approve, or ingest them into Provenance.
 
+The uncommitted V0.3 candidate also creates `Evidence/Runs/`,
+`Evidence/Claims/pending/`, and `Evidence/Claims/reviewed/` during project
+initialization. Provenance validates explicitly selected `experiment-run/1.x` and
+`claim-evidence/1.x` files, then returns a zero-write preview with an exact `plan_id`
+and aggregate changes. A write requires the same inputs plus
+`--run --plan-id <preview-plan-id>`; source or registry changes invalidate the plan.
+Accepted producer claims are still stored as local untrusted candidates in a derived,
+rebuildable registry. Strict fingerprints, identity checks, path/secret sanitization,
+and fail-closed loaders protect that derived state. This is candidate ingestion, not
+human approval or scientific validation: the suite does not yet recompute a referenced
+artifact's SHA-256 from its real bytes, promote a reviewed Claim, expose the registry
+through a public query API, or include it in Context Capsule 0.2.
+
 ## Source quickstart on Windows
 
 Prerequisites: Git and Python 3.11+. Clone the four repositories into one parent
 directory so the default source discovery is predictable:
+
+Do not mix arbitrary branches. For a published release, use the matching release
+tags. While reviewing this candidate PR, use the exact component commits pinned in
+`.github/workflows/ci.yml`; dependency repositories' floating `main` branches may
+still expose the previous release until the candidates are merged.
 
 ```powershell
 mkdir scriptorium-workspace
@@ -163,12 +184,22 @@ python -m venv .venv
 # Install the two runtime components into the same isolated environment:
 .\.venv\Scripts\python.exe -m pip install --no-deps -e ..\steward
 .\.venv\Scripts\python.exe -m pip install --no-deps -e ..\Provenance
+
+# Keep this PowerShell open. Agent processes launched from it inherit the same CLI.
+$SuiteScripts = (Resolve-Path .\.venv\Scripts).Path
+$env:PATH = "$SuiteScripts;$env:PATH"
+scriptorium --version
+steward --version
+prov-context --version
 ```
 
 Depending on the local Python environment, editable installation may contact the
 configured package index to obtain declared build requirements such as
 `setuptools>=68`. The no-runtime-network statement applies only after source
 installation is complete; it is not an offline-install guarantee.
+The canonical Agent Skill invokes the bare `scriptorium` command. If you open a
+new terminal later, add the same venv `Scripts` directory to `PATH` again before
+starting Codex or Claude Code.
 
 ### Optional: preview existing local sources
 
@@ -272,19 +303,53 @@ $ProvenanceHome = Join-Path $HOME "Research\scriptorium-data"
 .\.venv\Scripts\scriptorium.exe status
 ```
 
-Open or restart Codex in `$Workspace`, then send this as the first prompt:
+Start Codex from the same PowerShell so it inherits the suite CLI, then send this
+as the first prompt:
+
+```powershell
+Push-Location $Workspace
+Get-Command scriptorium
+codex
+```
 
 ```text
 $scriptorium-research Read Projects/ai4science-pilot.md, turn the initial intuition into one falsifiable research question, and propose the smallest evidence-backed next step. Do not write high-value project claims until I approve the exact change.
 ```
 
-Back in PowerShell, preview the local capture/sync plan and then explicitly run the
-reviewed plan:
+End the Agent task and return to PowerShell. The conservative Codex scanner accepts
+a session only after its log has remained unchanged for 300 seconds. Wait up to five
+minutes, then preview the local capture/sync plan and explicitly run only the plan
+you reviewed:
 
 ```powershell
-.\.venv\Scripts\scriptorium.exe pull
-.\.venv\Scripts\scriptorium.exe pull --run
-.\.venv\Scripts\scriptorium.exe status
+scriptorium pull
+scriptorium pull --run
+scriptorium status
+```
+
+An `action-required` result is an expected review gate:
+
+1. For `agent-fill`, resume the originating Agent task and ask
+   `$scriptorium-research` to inspect the pending sanitized scaffold and propose the
+   exact fill. Approve that fill explicitly, then preview and run `scriptorium pull`
+   again.
+2. For `human-approval`, open `$Workspace\Approvals.md`, review or edit the exact
+   candidate, and check only that entry. Do not use a blanket approval. Save the file,
+   run `scriptorium pull` in preview mode, and authorize `scriptorium pull --run`
+   separately only when the plan is correct.
+3. Finish by running `scriptorium resume --project ai4science-pilot --json`. The
+   Capsule must contain approved state and low-risk progress, while excluding the raw
+   transcript, pending fill, rejected drafts, and local paths.
+
+To exercise cross-host recovery, install the same canonical Skill for the second
+host, start it from this PATH-configured terminal in `$Workspace`, and ask it to
+resume the same project. Installing the Skill does not install the Agent itself:
+
+```powershell
+scriptorium host install claude-code
+scriptorium resume --project ai4science-pilot --json
+claude
+Pop-Location
 ```
 
 By default init writes the suite selection to
@@ -502,12 +567,12 @@ evidence for safe ranges.
 
 ## Next product increments
 
-1. run the current migration, install lifecycle, and slide handoff gates on fresh
-   remote Windows CI and in an isolated user environment before promotion;
-2. wire the approved `experiment-run/1.0` contract into local run registration,
-   persistence, and query, including failed runs, without embedding a compute engine;
-3. wire `claim-evidence/1.0` into validation, human review, and explicit links
-   between run evidence and candidate claims;
+1. run the current migration, install lifecycle, evidence-ingest, privacy, and slide
+   handoff gates on fresh remote Windows CI before promoting the uncommitted candidate;
+2. add the local human-review boundary that recomputes SHA-256 from the referenced
+   artifact bytes and explicitly promotes an approved Claim without changing its source;
+3. expose reviewed runs and candidates through a bounded read-only query and
+   Context Capsule 0.2, while keeping unapproved claims visibly non-authoritative;
 4. verify real-provider Lectern output and live Claude Code `SessionEnd` parity;
 5. run an external-user Alpha and use the evidence to shape packaging and
    compatibility ranges.

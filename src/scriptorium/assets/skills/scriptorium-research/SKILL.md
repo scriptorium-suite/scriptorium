@@ -46,6 +46,30 @@ CLI, read-only MCP tools, and owned files as its stable interface.
 4. Produce a reviewable increment.
    - Use the schema validator before claiming a versioned artifact is valid.
    - Use only public CLI, MCP, and file contracts; do not import component internals.
+   - Create an `experiment-run/1.0` file under `Evidence/Runs/` only when an
+     identified executor actually ran the recorded code and its inputs, parameters,
+     environment, logs, outputs, and status can be checked. Never turn a proposed
+     experiment, model narrative, or unobserved result into a run record.
+   - Write an Agent-proposed `claim-evidence/1.0` only to
+     `Evidence/Claims/pending/` with `review_state: draft`. When it cites an
+     experiment run, bind the exact `source_id`, `artifact_id`, `sha256`, and
+     `locator`; calculate the digest from the actual artifact bytes. A succeeded run
+     is an execution fact, not an accepted or scientifically supported Claim.
+   - Never write to `Evidence/Claims/reviewed/`, promote a Claim, alter a local
+     review decision, or tick an approval checkbox. Those actions belong to the
+     user's local approval workflow.
+   - Validate run and Claim files against the compatible scriptorium-spec build
+     before evidence ingestion. Run the zero-write preview
+     `prov-ingest-evidence <explicit-inputs> --json` before every evidence write.
+     Read the exact `plan_id` and aggregate `added`, `updated`, and `total` values
+     from that preview; enumerate the planned `run_id` and `claim_id` values from
+     the validated, explicitly selected input files. Show all of them to the user
+     and ask the user to authorize only that exact plan.
+   - Execute the approved plan against the same explicit inputs only with
+     `prov-ingest-evidence <same-explicit-inputs> --run --plan-id <preview-plan-id> --json`.
+     If any source file or the evidence registry changes, or the command reports
+     `plan-mismatch`, rerun the zero-write preview and request a new authorization.
+     Never reuse an old `plan_id` or treat one approval as permission for a later plan.
    - If an optional capability such as Zotero, Obsidian, Lectern, PowerPoint, a
      browser extension, or a parser is absent, preserve the core Markdown path and
      report the degradation explicitly.

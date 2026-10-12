@@ -72,6 +72,13 @@ class InitCliTests(unittest.TestCase):
             self.assertTrue(
                 (workspace / "Projects" / "catalyst-screening.md").is_file()
             )
+            for relative in (
+                "Evidence/Runs",
+                "Evidence/Claims/pending",
+                "Evidence/Claims/reviewed",
+            ):
+                self.assertTrue((workspace / relative).is_dir())
+            self.assertFalse((workspace / "Evidence" / "Evidence-Approvals.md").exists())
             self.assertTrue(provenance_home.is_dir())
             self.assertTrue(resolve_config_path(config_dir).is_file())
 

@@ -74,7 +74,16 @@ class InitTests(unittest.TestCase):
             self.assertEqual(report["status"], "initialized")
             self.assertEqual(report["exit_code"], 0)
             self.assertTrue(home.is_dir())
-            for relative in ("Projects", "Inbox", "_planning"):
+            for relative in (
+                "Projects",
+                "Inbox",
+                "_planning",
+                "Evidence",
+                "Evidence/Runs",
+                "Evidence/Claims",
+                "Evidence/Claims/pending",
+                "Evidence/Claims/reviewed",
+            ):
                 self.assertTrue((workspace / relative).is_dir())
             text = note.read_text(encoding="utf-8")
             self.assertIn('title: "催化剂 Screening Study"', text)
@@ -132,10 +141,19 @@ class InitTests(unittest.TestCase):
             first = run_init(**arguments, idea="Initial idea", run=True)
             self.assertEqual(first["status"], "initialized")
             note = arguments["workspace"] / "Projects" / "catalyst-screening.md"
+            candidate = (
+                arguments["workspace"]
+                / "Evidence"
+                / "Claims"
+                / "pending"
+                / "human-owned.json"
+            )
+            candidate.write_bytes(b'{"human_owned":true}\n')
             note.write_bytes(note.read_bytes() + b"\nHuman edit outside the managed region.\n")
             config_path = resolve_config_path(arguments["config_dir"])
             note_before = note.read_bytes()
             config_before = config_path.read_bytes()
+            candidate_before = candidate.read_bytes()
             second_arguments = dict(arguments)
             second_arguments.update(
                 title="A different requested title",
@@ -148,6 +166,7 @@ class InitTests(unittest.TestCase):
             self.assertEqual(second["summary"]["create"], 0)
             self.assertEqual(note.read_bytes(), note_before)
             self.assertEqual(config_path.read_bytes(), config_before)
+            self.assertEqual(candidate.read_bytes(), candidate_before)
 
     def test_existing_human_workspace_content_is_preserved(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -161,6 +180,74 @@ class InitTests(unittest.TestCase):
 
             self.assertEqual(report["exit_code"], 0)
             self.assertEqual(human_file.read_bytes(), b"human-owned\r\ncontent\r\n")
+
+    def test_nested_evidence_file_conflict_is_content_free_and_zero_write(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            arguments = self.paths(root)
+            evidence = arguments["workspace"] / "Evidence"
+            evidence.mkdir(parents=True)
+            conflict = evidence / "Claims"
+            conflict.write_bytes(b"human-owned\n")
+
+            report = run_init(**arguments, run=True)
+
+            self.assertEqual(report["status"], "conflict")
+            self.assertEqual(report["exit_code"], 1)
+            self.assertEqual(report["conflict"]["code"], "directory-conflict")
+            self.assertEqual(report["conflict"]["path"], "Evidence/Claims")
+            self.assertNotIn(str(root), str(report["conflict"]))
+            self.assertEqual(conflict.read_bytes(), b"human-owned\n")
+            self.assertFalse((arguments["workspace"] / "Projects").exists())
+            self.assertFalse(resolve_config_path(arguments["config_dir"]).exists())
+            self.assertFalse(arguments["provenance_home"].exists())
+
+    def test_nested_evidence_link_is_rejected_before_writes(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            arguments = self.paths(root)
+            evidence = arguments["workspace"] / "Evidence"
+            evidence.mkdir(parents=True)
+            target = root / "outside"
+            target.mkdir()
+            claims = evidence / "Claims"
+            try:
+                claims.symlink_to(target, target_is_directory=True)
+            except OSError:
+                self.skipTest("directory symlinks are not available")
+
+            with self.assertRaisesRegex(InitError, "link-like"):
+                run_init(**arguments, run=True)
+
+            self.assertTrue(claims.is_symlink())
+            self.assertFalse((arguments["workspace"] / "Projects").exists())
+            self.assertFalse(resolve_config_path(arguments["config_dir"]).exists())
+            self.assertFalse(arguments["provenance_home"].exists())
+
+    def test_nested_evidence_identity_race_never_publishes_config(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            arguments = self.paths(root)
+            real_assert = init_module._assert_managed_directory_current
+            raced = False
+
+            def fail_evidence(path, descriptor):
+                nonlocal raced
+                if not raced and path == arguments["workspace"] / "Evidence":
+                    raced = True
+                    raise InitError("managed directory path identity changed")
+                return real_assert(path, descriptor)
+
+            with mock.patch.object(
+                init_module,
+                "_assert_managed_directory_current",
+                side_effect=fail_evidence,
+            ):
+                with self.assertRaisesRegex(InitError, "path identity changed"):
+                    run_init(**arguments, run=True)
+
+            self.assertTrue(raced)
+            self.assertFalse(resolve_config_path(arguments["config_dir"]).exists())
 
     def test_project_identity_conflict_is_exit_one_and_writes_nothing_else(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -330,13 +417,14 @@ class InitTests(unittest.TestCase):
             root = Path(temporary)
             arguments = self.paths(root)
             arguments["workspace"].mkdir()
-            unsafe = arguments["workspace"] / "Projects"
-            with mock.patch(
-                "scriptorium.init._is_linklike",
-                side_effect=lambda path: path == unsafe,
-            ):
-                with self.assertRaisesRegex(InitError, "link-like"):
-                    run_init(**arguments)
+            for relative in ("Projects", "Evidence/Claims/pending"):
+                unsafe = arguments["workspace"] / relative
+                with self.subTest(relative=relative), mock.patch(
+                    "scriptorium.init._is_linklike",
+                    side_effect=lambda path, unsafe=unsafe: path == unsafe,
+                ):
+                    with self.assertRaisesRegex(InitError, "link-like"):
+                        run_init(**arguments)
 
     def test_reparse_detection_is_fail_closed(self):
         with tempfile.TemporaryDirectory() as temporary:

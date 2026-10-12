@@ -661,6 +661,7 @@ def execute(args: argparse.Namespace) -> dict[str, Any]:
         "format_version": 1,
         "operation": "windows-install-lifecycle",
         "status": "passed",
+        "exit_code": 0,
         "components": identities,
         "platform": {
             "implementation": sys.implementation.name,
@@ -690,6 +691,7 @@ def main(argv: list[str] | None = None) -> int:
             "format_version": 1,
             "operation": "windows-install-lifecycle",
             "status": "failed",
+            "exit_code": 1,
             "failure": {"stage": exc.stage, "message": exc.safe_message},
         }
         exit_code = 1
@@ -698,6 +700,7 @@ def main(argv: list[str] | None = None) -> int:
             "format_version": 1,
             "operation": "windows-install-lifecycle",
             "status": "failed",
+            "exit_code": 2,
             "failure": {
                 "stage": "internal",
                 "message": "The lifecycle runner encountered an internal failure.",
@@ -712,6 +715,7 @@ def main(argv: list[str] | None = None) -> int:
                 "format_version": 1,
                 "operation": "windows-install-lifecycle",
                 "status": "failed",
+                "exit_code": 2,
                 "failure": {"stage": exc.stage, "message": exc.safe_message},
             }
             exit_code = 2

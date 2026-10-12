@@ -36,6 +36,9 @@ jobs:
 
   e2e-windows:
     runs-on: windows-latest
+    env:
+      EVIDENCE_ARTIFACT_NAME: scriptorium-v0.2.0-windows-evidence
+      EVIDENCE_TEST_CONTEXT: windows-e2e
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -43,7 +46,7 @@ jobs:
           persist-credentials: false
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          ref: v0.1.0
+          ref: 39cd0bebd2c956537e06fa625e8600ef1a9ab937 # v0.1.0
           path: scriptorium-v0.1.0
           persist-credentials: false
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -96,6 +99,7 @@ jobs:
           $report = Get-Content -LiteralPath .\install-lifecycle-report.json -Raw | ConvertFrom-Json
           if (
             $report.status -ne "passed" -or
+            $report.exit_code -ne 0 -or
             $report.lifecycle.clean_install -ne "passed" -or
             $report.lifecycle.uninstall -ne "passed" -or
             $report.lifecycle.reinstall -ne "passed" -or
@@ -386,11 +390,50 @@ jobs:
             --provenance-root .\Provenance
           .\.demo-venv\Scripts\python.exe -m json.tool '.\demo 输出\demo-report.json'
           .\.demo-venv\Scripts\python.exe -c "import json, pathlib; report=json.loads(pathlib.Path(r'.\demo 输出\demo-report.json').read_text(encoding='utf-8')); assert report['demo_status'] == 'passed'"
+      - name: Prepare shareable CI evidence
+        shell: pwsh
+        env:
+          SUBJECT_COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+          RAW_BASE_COMMIT: ${{ github.event.pull_request.base.sha || github.event.before || 'none' }}
+        run: |
+          $checkoutCommit = (& git -C .\scriptorium rev-parse HEAD).Trim()
+          if ($LASTEXITCODE -ne 0) { throw "Checkout commit probe failed" }
+          $eventName = '${{ github.event_name }}'
+          $checkoutMode = switch ($eventName) {
+            'pull_request' { 'pull-request-merge' }
+            'push' { 'push' }
+            'workflow_dispatch' { 'workflow-dispatch' }
+            default { throw "Unsupported checkout event" }
+          }
+          $baseCommit = $env:RAW_BASE_COMMIT
+          if ($baseCommit -eq 'none' -or $baseCommit -match '^0{40}$') {
+            $baseCommit = 'none'
+          }
+
+          & .\.demo-venv\Scripts\python.exe `
+            .\scriptorium\tools\prepare_ci_evidence.py `
+            --doctor-report .\doctor-report.json `
+            --demo-root '.\demo 输出' `
+            --install-report .\install-lifecycle-report.json `
+            --fixture-root .\scriptorium\src\scriptorium\assets `
+            --output-dir .\ci-evidence `
+            --repository '${{ github.repository }}' `
+            --subject-commit $env:SUBJECT_COMMIT `
+            --checkout-commit $checkoutCommit `
+            --base-commit $baseCommit `
+            --checkout-repository .\scriptorium `
+            --checkout-mode $checkoutMode `
+            --run-id '${{ github.run_id }}' `
+            --run-attempt '${{ github.run_attempt }}' `
+            --event-name '${{ github.event_name }}' `
+            --runner-os '${{ runner.os }}' `
+            --artifact-name $env:EVIDENCE_ARTIFACT_NAME `
+            --test-context $env:EVIDENCE_TEST_CONTEXT
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: scriptorium-demo-windows
-          path: |
-            demo 输出
-            doctor-report.json
-            install-lifecycle-report.json
-          retention-days: 14
+          name: ${{ env.EVIDENCE_ARTIFACT_NAME }}
+          path: ci-evidence
+          if-no-files-found: error
+          include-hidden-files: false
+          retention-days: 90
